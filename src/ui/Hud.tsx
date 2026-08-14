@@ -6,13 +6,13 @@ import { TABLES } from '../scene/hallLayout'
  * HUD。存在的意义是证明一件事：2D UI 和 3D 场景吃的是同一个 store，
  * 以后 WebSocket 推来的游戏状态会同时驱动这两边。
  *
- * 三种模式三套 UI：走动（准心 + 提示）、转场（全清空）、落座（玩家列表）。
+ * 注意这里**没有准心**了 —— 选座改成了光标 hover，提示牌直接贴在
+ * 那把椅子上方（见 Seat.tsx），而不是永远悬在屏幕正中。
  */
 export function Hud() {
   const mode = usePlayerStore((s) => s.mode)
-  const hovered = usePlayerStore((s) => s.hovered)
   const seatedAt = usePlayerStore((s) => s.seatedAt)
-  const locked = usePlayerStore((s) => s.locked)
+  const entered = usePlayerStore((s) => s.entered)
 
   const occupancy = useGameStore((s) => s.occupancy)
   const speakingKey = useGameStore((s) => s.speakingKey)
@@ -25,31 +25,15 @@ export function Hud() {
         <div className="hud-title">DOLOS</div>
         <div className="hud-sub">
           {mode === 'walking'
-            ? locked
-              ? 'WASD 移动 · 鼠标环视 · 看向空位按 E 坐下'
-              : '点击画面开始'
+            ? 'WASD 移动 · 按住拖拽环视 · 指向空位按 E 或点击坐下'
             : mode === 'seated'
               ? '按住拖拽环视 · Q 起身'
               : ''}
         </div>
       </div>
 
-      {/* 走动模式的准心 */}
-      {mode === 'walking' && locked && (
-        <div className={`crosshair${hovered ? ' crosshair-active' : ''}`} />
-      )}
+      {!entered && <ClickToStart />}
 
-      {/* 未锁定时的启动遮罩 */}
-      {mode === 'walking' && !locked && <ClickToStart />}
-
-      {/* 瞄准空位时的坐下提示 */}
-      {mode === 'walking' && locked && hovered && (
-        <div className="prompt">
-          <kbd>E</kbd> 坐下
-        </div>
-      )}
-
-      {/* 落座后的同桌玩家列表 */}
       {mode === 'seated' && seatedTable && (
         <div className="hud-bottom">
           {(occupancy[seatedTable.id] ?? []).map((occ, i) => {
@@ -80,16 +64,14 @@ export function Hud() {
 }
 
 /**
- * PointerLock 必须由用户手势触发，浏览器不允许自动锁定。
- * 所以需要这么一个点击层 —— 顺便也是个进入游戏的仪式感。
+ * 进场页。已经不再需要它去申请指针锁定了，留着是因为：
+ * 浏览器要求 AudioContext 必须在用户手势之后才能启动，接真语音时
+ * 这一下点击就是那个手势。顺带也是个进入酒吧的仪式感。
  */
 function ClickToStart() {
-  const request = () => {
-    const canvas = document.querySelector('canvas')
-    canvas?.requestPointerLock()
-  }
+  const setEntered = usePlayerStore((s) => s.setEntered)
   return (
-    <div className="start-overlay" onClick={request}>
+    <div className="start-overlay" onClick={() => setEntered(true)}>
       <div className="start-card">
         <div className="start-title">DOLOS</div>
         <div className="start-desc">点击进入酒吧</div>
@@ -100,6 +82,7 @@ function ClickToStart() {
             <kbd>S</kbd>
             <kbd>D</kbd> 移动
           </span>
+          <span>按住拖拽 环视</span>
           <span>
             <kbd>E</kbd> 坐下
           </span>

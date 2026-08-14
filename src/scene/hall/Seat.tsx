@@ -1,15 +1,21 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { registerSeat } from '../../player/seatRegistry'
 import { usePlayerStore } from '../../state/usePlayerStore'
+import { useGameStore } from '../../state/useGameStore'
 import { seatFacing, seatLocal } from '../hallLayout'
 
+/** 超过这个距离够不着，只高亮不给坐 */
+const REACH = 3.6
+
 /**
- * 一把椅子 + 一个不可见的命中体。
+ * 一把椅子 + 一个透明的命中体。
  *
- * 命中体比椅子大一圈，因为准心对准一把细腿椅子太难瞄了 ——
- * 交互体积永远该比视觉体积宽容，这是手感的一部分。
+ * 命中体用 opacity=0 的材质而不是 visible={false}：three 的 Raycaster
+ * 会跳过 visible=false 的对象，那样 R3F 的指针事件永远收不到。
+ * 它也比椅子本身大一圈 —— 交互体积永远该比视觉体积宽容，
+ * 拿光标去够细椅子腿不是什么好体验。
  */
 export function Seat({
   tableId,
@@ -22,29 +28,51 @@ export function Seat({
   seatCount: number
   empty: boolean
 }) {
-  const hit = useRef<THREE.Mesh>(null)
   const glow = useRef<THREE.MeshBasicMaterial>(null)
+  const hit = useRef<THREE.Mesh>(null)
+  const inReach = useRef(false)
+  const worldPos = useRef(new THREE.Vector3())
+  const frame = useRef(0)
+
+  const mode = usePlayerStore((s) => s.mode)
   const hovered = usePlayerStore((s) => s.hovered)
+  const setHovered = usePlayerStore((s) => s.setHovered)
+  const beginSit = usePlayerStore((s) => s.beginSit)
+  const claimSeat = useGameStore((s) => s.claimSeat)
+
   const isHovered =
     !!hovered && hovered.tableId === tableId && hovered.seat === index
+  const selectable = empty && mode === 'walking'
 
   const pos = seatLocal(index, seatCount)
   const rot = seatFacing(index, seatCount)
 
-  // 只有空位才注册进射线检测 —— 有人坐的椅子不该被瞄上
-  useEffect(() => {
-    if (!empty || !hit.current) return
-    return registerSeat({ tableId, seat: index, mesh: hit.current })
-  }, [empty, tableId, index])
+  useFrame(({ camera }, dt) => {
+    // 距离检查降频到 6 帧一次，玩家不可能在 1/10 秒里跨越三米
+    frame.current++
+    if (hit.current && frame.current % 6 === 0) {
+      hit.current.getWorldPosition(worldPos.current)
+      const near = camera.position.distanceTo(worldPos.current) < REACH
+      if (near !== inReach.current) {
+        inReach.current = near
+        // 走出范围时要主动摘掉 hover，否则提示会一直挂在那儿
+        if (!near && isHovered) setHovered(null)
+      }
+    }
 
-  useFrame((_, dt) => {
     if (!glow.current) return
     const t = performance.now() / 1000
-    // 空位常态微微呼吸，被瞄准时亮起来
-    const base = empty ? 0.16 + Math.sin(t * 2.1 + index) * 0.05 : 0
-    const target = isHovered ? 0.85 : base
+    // 空位常态微微呼吸，被指到时亮起来
+    const base = selectable ? 0.16 + Math.sin(t * 2.1 + index) * 0.05 : 0
+    const target = isHovered ? 0.9 : base
     glow.current.opacity = THREE.MathUtils.damp(glow.current.opacity, target, 12, dt)
   })
+
+  const sit = () => {
+    if (!selectable || !inReach.current) return
+    claimSeat(tableId, index, { name: '你', color: '#c9a227', isAI: false })
+    beginSit({ tableId, seat: index })
+  }
 
   return (
     <group position={pos} rotation={[0, rot, 0]}>
@@ -85,10 +113,39 @@ export function Seat({
         />
       </mesh>
 
-      {/* 命中体：不可见，但比椅子宽容得多 */}
-      <mesh ref={hit} position={[0, 0.7, 0]} visible={false}>
+      {/* 提示牌贴在椅子上方，而不是屏幕正中 */}
+      {isHovered && (
+        <Html
+          position={[0, 1.15, 0]}
+          center
+          zIndexRange={[20, 10]}
+          style={{ pointerEvents: 'none', userSelect: 'none' }}
+        >
+          <div className="seat-prompt">
+            <kbd>E</kbd> 坐下
+          </div>
+        </Html>
+      )}
+
+      {/* 命中体：透明但可被射线击中，且比椅子宽容 */}
+      <mesh
+        ref={hit}
+        position={[0, 0.7, 0]}
+        onPointerOver={(e) => {
+          if (!selectable) return
+          e.stopPropagation()
+          setHovered({ tableId, seat: index })
+        }}
+        onPointerOut={() => {
+          if (isHovered) setHovered(null)
+        }}
+        onClick={(e) => {
+          e.stopPropagation()
+          sit()
+        }}
+      >
         <boxGeometry args={[0.8, 1.5, 0.8]} />
-        <meshBasicMaterial />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
     </group>
   )

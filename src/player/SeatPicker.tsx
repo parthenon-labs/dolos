@@ -1,34 +1,23 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
-import * as THREE from 'three'
-import { seatMeshes, seatOf } from './seatRegistry'
+import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '../state/usePlayerStore'
 import { useGameStore } from '../state/useGameStore'
 
-/** 超过这个距离就算够不着，不给坐 */
-const REACH = 3.4
-
 /**
- * 从屏幕中心发射线找空位，并处理坐下 / 起身按键。
+ * 坐下 / 起身的键盘处理。
  *
- * 射线检测每 3 帧做一次 —— 60fps 下等于 20Hz，人眼完全感知不到延迟，
- * 但省掉三分之二的 raycast 开销。这类"够用就好"的降频在
- * 每帧遍历场景的逻辑里非常值得做。
+ * 选座本身已经交给 Seat 组件上的 R3F 指针事件了 —— 有了自由光标就不再需要
+ * 手动从屏幕中心发射线，那套 registry + raycast 全部删掉了。
+ * 这里只剩下键盘：hover 着按 E 坐下，坐着按 Q / Esc 起身。
  */
 export function SeatPicker() {
-  const { camera } = useThree()
-  const raycaster = useMemo(() => new THREE.Raycaster(), [])
-  const center = useMemo(() => new THREE.Vector2(0, 0), [])
-  const frame = useRef(0)
-
   const mode = usePlayerStore((s) => s.mode)
   const hovered = usePlayerStore((s) => s.hovered)
   const seatedAt = usePlayerStore((s) => s.seatedAt)
-  const setHovered = usePlayerStore((s) => s.setHovered)
   const beginSit = usePlayerStore((s) => s.beginSit)
   const beginStand = usePlayerStore((s) => s.beginStand)
   const claimSeat = useGameStore((s) => s.claimSeat)
 
+  // 用 ref 读最新值，避免每次 hover 变化都重新绑定键盘监听
   const modeRef = useRef(mode)
   modeRef.current = mode
   const hoveredRef = useRef(hovered)
@@ -38,11 +27,14 @@ export function SeatPicker() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return
+
       if (e.code === 'KeyE' && modeRef.current === 'walking' && hoveredRef.current) {
         const h = hoveredRef.current
         claimSeat(h.tableId, h.seat, { name: '你', color: '#c9a227', isAI: false })
         beginSit(h)
       }
+
       if (
         (e.code === 'KeyQ' || e.code === 'Escape') &&
         modeRef.current === 'seated' &&
@@ -56,25 +48,6 @@ export function SeatPicker() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [beginSit, beginStand, claimSeat])
-
-  useFrame(() => {
-    if (mode !== 'walking') {
-      if (hoveredRef.current) setHovered(null)
-      return
-    }
-    frame.current++
-    if (frame.current % 3 !== 0) return
-
-    raycaster.setFromCamera(center, camera)
-    raycaster.far = REACH
-    const hits = raycaster.intersectObjects(seatMeshes(), false)
-    if (hits.length === 0) {
-      setHovered(null)
-      return
-    }
-    const found = seatOf(hits[0].object)
-    setHovered(found ? { tableId: found.tableId, seat: found.seat } : null)
-  })
 
   return null
 }

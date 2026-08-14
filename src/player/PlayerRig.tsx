@@ -26,11 +26,14 @@ const STAND_DURATION = 0.85
 const FOV_WALK = 72
 const FOV_SEATED = 60
 
-// 走动时 yaw 不设限（转身要自由），落座后夹在朝向桌心的 ±78° 内 ——
-// 你是坐着的，不该能转 360°。
+// 落座后视角夹在朝向桌心的 ±78° 内 —— 你是坐着的，不该能转 360°。
+// 走动时 yaw 不设限，pitch 仍然要夹，否则能翻到脑后。
 const SEATED_YAW_LIMIT = THREE.MathUtils.degToRad(78)
 const SEATED_PITCH_UP = THREE.MathUtils.degToRad(20)
 const SEATED_PITCH_DOWN = THREE.MathUtils.degToRad(34)
+const WALK_PITCH = THREE.MathUtils.degToRad(72)
+
+const LOOK_SPEED = 0.0026
 
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
@@ -42,8 +45,10 @@ const easeInOutCubic = (t: number) =>
  * 多个组件同时写 camera.position/rotation 会互相打架，而且 bug 极难查。
  * 谁拥有相机，必须是明确的一个地方。
  *
- * 走动模式用 PointerLock（标准 FPS 手感），落座后立刻解锁，
- * 因为牌桌上要用光标点牌、点按钮、点玩家。
+ * 输入方案：**不锁指针**，按住拖拽转视角，光标始终可见。
+ * 代价是转视角要按住鼠标，不如 FPS 顺手；换来的是光标能去 hover 椅子、
+ * 点牌、点按钮 —— 对一个牌桌游戏这笔交易是划算的。
+ * 走动和落座共用同一套拖拽逻辑，只是角度限制不同。
  */
 export function PlayerRig() {
   const { camera, gl } = useThree()
@@ -52,11 +57,9 @@ export function PlayerRig() {
   const seatedAt = usePlayerStore((s) => s.seatedAt)
   const finishSit = usePlayerStore((s) => s.finishSit)
   const finishStand = usePlayerStore((s) => s.finishStand)
-  const setLocked = usePlayerStore((s) => s.setLocked)
 
   // 位置只维护水平分量，Y 由模式决定
   // 出生在大厅后方靠墙处，yaw=0 面朝 -Z，也就是望进整个大厅。
-  // （three 的默认朝向是 -Z；给 PI 会让玩家开局盯着身后那面墙。）
   const pos = useRef(new THREE.Vector2(0, 6.2))
   const vel = useRef(new THREE.Vector2())
   const yaw = useRef(0)
@@ -68,8 +71,9 @@ export function PlayerRig() {
   const keys = useRef<Record<string, boolean>>({})
   const dragging = useRef(false)
   const lastPointer = useRef({ x: 0, y: 0 })
+  /** 落座时朝向桌心的基准 yaw，环视限制以它为中心 */
+  const seatedBaseYaw = useRef(0)
 
-  // 转场状态
   const tween = useRef<{
     t: number
     dur: number
@@ -85,7 +89,7 @@ export function PlayerRig() {
   const modeRef = useRef(mode)
   modeRef.current = mode
 
-  /* ---------------- 输入 ---------------- */
+  /* ---------------- 键盘 ---------------- */
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -94,85 +98,79 @@ export function PlayerRig() {
     const onKeyUp = (e: KeyboardEvent) => {
       keys.current[e.code] = false
     }
+    const onBlur = () => {
+      // 切走窗口时按键的 keyup 收不到，回来会一直往前飘
+      keys.current = {}
+    }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
     }
   }, [])
 
-  // 走动模式：PointerLock 鼠标视角
+  /* ---------------- 拖拽转视角 ---------------- */
+
   useEffect(() => {
     const el = gl.domElement
 
-    const onLockChange = () => {
-      const locked = document.pointerLockElement === el
-      setLocked(locked)
-    }
-    const onMouseMove = (e: MouseEvent) => {
-      if (document.pointerLockElement !== el) return
-      if (modeRef.current !== 'walking') return
-      targetYaw.current -= e.movementX * 0.0022
-      targetPitch.current = THREE.MathUtils.clamp(
-        targetPitch.current - e.movementY * 0.0022,
-        -Math.PI / 2 + 0.05,
-        Math.PI / 2 - 0.05,
-      )
-    }
-
-    document.addEventListener('pointerlockchange', onLockChange)
-    document.addEventListener('mousemove', onMouseMove)
-    return () => {
-      document.removeEventListener('pointerlockchange', onLockChange)
-      document.removeEventListener('mousemove', onMouseMove)
-    }
-  }, [gl, setLocked])
-
-  // 落座模式：按住拖拽环视（不锁指针，光标要留给 UI）
-  useEffect(() => {
-    const el = gl.domElement
     const onDown = (e: PointerEvent) => {
-      if (modeRef.current !== 'seated') return
+      if (modeRef.current !== 'walking' && modeRef.current !== 'seated') return
       dragging.current = true
       lastPointer.current = { x: e.clientX, y: e.clientY }
-      el.setPointerCapture(e.pointerId)
     }
+
+    // move/up 挂在 window 而不是 canvas，也不用 setPointerCapture ——
+    // 捕获会干扰 R3F 自己的事件系统，而 hover 选座正依赖它。
     const onMove = (e: PointerEvent) => {
-      if (!dragging.current || modeRef.current !== 'seated') return
+      if (!dragging.current) return
+      const m = modeRef.current
+      if (m !== 'walking' && m !== 'seated') return
+
       const dx = e.clientX - lastPointer.current.x
       const dy = e.clientY - lastPointer.current.y
       lastPointer.current = { x: e.clientX, y: e.clientY }
-      const base = seatedBaseYaw.current
-      targetYaw.current = THREE.MathUtils.clamp(
-        targetYaw.current - dx * 0.0026,
-        base - SEATED_YAW_LIMIT,
-        base + SEATED_YAW_LIMIT,
-      )
-      targetPitch.current = THREE.MathUtils.clamp(
-        targetPitch.current - dy * 0.0026,
-        -SEATED_PITCH_DOWN,
-        SEATED_PITCH_UP,
-      )
+
+      if (m === 'seated') {
+        const base = seatedBaseYaw.current
+        targetYaw.current = THREE.MathUtils.clamp(
+          targetYaw.current - dx * LOOK_SPEED,
+          base - SEATED_YAW_LIMIT,
+          base + SEATED_YAW_LIMIT,
+        )
+        targetPitch.current = THREE.MathUtils.clamp(
+          targetPitch.current - dy * LOOK_SPEED,
+          -SEATED_PITCH_DOWN,
+          SEATED_PITCH_UP,
+        )
+      } else {
+        targetYaw.current -= dx * LOOK_SPEED
+        targetPitch.current = THREE.MathUtils.clamp(
+          targetPitch.current - dy * LOOK_SPEED,
+          -WALK_PITCH,
+          WALK_PITCH,
+        )
+      }
     }
-    const onUp = (e: PointerEvent) => {
+
+    const onUp = () => {
       dragging.current = false
-      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
     }
+
     el.addEventListener('pointerdown', onDown)
-    el.addEventListener('pointermove', onMove)
-    el.addEventListener('pointerup', onUp)
-    el.addEventListener('pointercancel', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
     return () => {
       el.removeEventListener('pointerdown', onDown)
-      el.removeEventListener('pointermove', onMove)
-      el.removeEventListener('pointerup', onUp)
-      el.removeEventListener('pointercancel', onUp)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
   }, [gl])
-
-  /** 落座时朝向桌心的基准 yaw，环视限制以它为中心 */
-  const seatedBaseYaw = useRef(0)
 
   /* ---------------- 模式切换时启动转场 ---------------- */
 
@@ -181,9 +179,7 @@ export function PlayerRig() {
       const table = tableById(seatedAt.tableId)
       if (!table) return
       const target = seatedCamera(table, seatedAt.seat)
-      seatedBaseYaw.current = target.yaw
-      // 走动时指针是锁着的，坐下要立刻还给用户
-      if (document.pointerLockElement) document.exitPointerLock()
+      seatedBaseYaw.current = nearestAngle(yaw.current, target.yaw)
       tween.current = {
         t: 0,
         dur: SIT_DURATION,
@@ -191,7 +187,7 @@ export function PlayerRig() {
         toPos: new THREE.Vector3(...target.position),
         fromYaw: yaw.current,
         // 取和当前 yaw 最近的等价角，避免绕远路转一整圈
-        toYaw: nearestAngle(yaw.current, target.yaw),
+        toYaw: seatedBaseYaw.current,
         fromPitch: pitch.current,
         toPitch: -0.06,
         kind: 'sit',
@@ -224,7 +220,6 @@ export function PlayerRig() {
     // 切标签页回来时 dt 会是个巨大值，夹一下，否则玩家会瞬移穿墙
     const dt = Math.min(rawDt, 0.05)
     camera.rotation.order = 'YXZ'
-
     const cam = camera as THREE.PerspectiveCamera
 
     if (tween.current) {
@@ -236,10 +231,10 @@ export function PlayerRig() {
       const fovTo = tw.kind === 'sit' ? FOV_SEATED : FOV_WALK
       cam.fov = THREE.MathUtils.lerp(fovFrom, fovTo, k)
       cam.updateProjectionMatrix()
+
       yaw.current = THREE.MathUtils.lerp(tw.fromYaw, tw.toYaw, k)
       pitch.current = THREE.MathUtils.lerp(tw.fromPitch, tw.toPitch, k)
-      camera.rotation.y = yaw.current
-      camera.rotation.x = pitch.current
+      camera.rotation.set(pitch.current, yaw.current, 0)
 
       if (tw.t >= 1) {
         targetYaw.current = yaw.current
@@ -266,8 +261,11 @@ export function PlayerRig() {
       pitch.current = THREE.MathUtils.damp(pitch.current, targetPitch.current, 8, dt)
       // 极轻微的呼吸摇晃。没有它画面会"死"成一张静态图；幅度必须很小，大了会晕
       const t = performance.now() / 1000
-      camera.rotation.y = yaw.current + Math.sin(t * 0.47 + 1.3) * 0.0022
-      camera.rotation.x = pitch.current + Math.sin(t * 0.62) * 0.0032
+      camera.rotation.set(
+        pitch.current + Math.sin(t * 0.62) * 0.0032,
+        yaw.current + Math.sin(t * 0.47 + 1.3) * 0.0022,
+        0,
+      )
     }
   })
 
@@ -283,7 +281,13 @@ export function PlayerRig() {
     if (k['KeyA'] || k['ArrowLeft']) ix -= 1
     if (k['KeyD'] || k['ArrowRight']) ix += 1
 
-    // 输入向量绕 yaw 旋转到世界方向
+    // 输入向量绕 yaw 旋转到世界方向。
+    //
+    // 绕 Y 轴旋转 (vx, vz) 的正确形式是：
+    //   x' = vx*cos + vz*sin
+    //   z' = -vx*sin + vz*cos
+    // 校验：W 给 (0,-1) → (-sin, -cos)，正是 yaw 对应的前方（three 里 -Z 为前）。
+    // A 给 (-1,0) → (-cos, sin)，正是左方。
     tmp.set(0, 0)
     if (ix !== 0 || iz !== 0) {
       const len = Math.hypot(ix, iz)
@@ -291,7 +295,7 @@ export function PlayerRig() {
       const nz = iz / len
       const c = Math.cos(yaw.current)
       const s = Math.sin(yaw.current)
-      tmp.set(nx * c - nz * s, -nx * s - nz * c)
+      tmp.set(nx * c + nz * s, -nx * s + nz * c)
       tmp.multiplyScalar(WALK_SPEED)
     }
 
@@ -306,13 +310,12 @@ export function PlayerRig() {
     // 走路头部起伏，速度越快越明显
     const speed = vel.current.length()
     bobPhase.current += dt * speed * 3.4
-    const bob = Math.sin(bobPhase.current) * 0.028 * Math.min(1, speed / WALK_SPEED)
-    const roll = Math.cos(bobPhase.current * 0.5) * 0.007 * Math.min(1, speed / WALK_SPEED)
+    const ratio = Math.min(1, speed / WALK_SPEED)
+    const bob = Math.sin(bobPhase.current) * 0.028 * ratio
+    const roll = Math.cos(bobPhase.current * 0.5) * 0.007 * ratio
 
     camera.position.set(pos.current.x, STAND_HEIGHT + bob, pos.current.y)
-    camera.rotation.y = yaw.current
-    camera.rotation.x = pitch.current
-    camera.rotation.z = roll
+    camera.rotation.set(pitch.current, yaw.current, roll)
   }
 
   return null

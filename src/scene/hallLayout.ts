@@ -113,21 +113,45 @@ export function standingSpot(table: TableDef, i: number): [number, number] {
   return [w[0], w[2]]
 }
 
+/* ---------------- 吧台 ---------------- */
+
+/** 吧台的尺寸也放这里 —— 渲染和碰撞必须读同一份数字，否则迟早对不上 */
+export const BAR = {
+  /** 沿后墙铺开的 x 范围 */
+  x0: -9.2,
+  x1: -4.6,
+  /** 台面中心 z / 酒柜中心 z */
+  counterZ: -5.9,
+  backZ: -7.18,
+  counterH: 1.12,
+  /** 吧凳中心线相对台面的偏移 */
+  stoolOffset: 0.95,
+}
+
+export const BAR_STOOL_X = [BAR.x0 + 1.0, BAR.x0 + 2.3, BAR.x0 + 3.6]
+
 /* ---------------- 碰撞 ---------------- */
 
 export const PLAYER_RADIUS = 0.32
 
-/** 圆形障碍物：桌子（含椅子占地） */
-export const CIRCLE_OBSTACLES = TABLES.map((t) => ({
-  x: t.pos[0],
-  z: t.pos[1],
-  r: SEAT_RADIUS + 0.42,
-}))
+/** 圆形障碍物：桌子（含椅子占地）+ 吧凳 */
+export const CIRCLE_OBSTACLES = [
+  ...TABLES.map((t) => ({
+    x: t.pos[0],
+    z: t.pos[1],
+    r: SEAT_RADIUS + 0.42,
+  })),
+  ...BAR_STOOL_X.map((x, i) => ({
+    x,
+    z: BAR.counterZ + BAR.stoolOffset + (i === 1 ? 0.12 : 0),
+    r: 0.3,
+  })),
+]
 
-/** 方形障碍物：吧台等。[minX, minZ, maxX, maxZ] */
+/** 方形障碍物。[minX, minZ, maxX, maxZ] */
 export const BOX_OBSTACLES: [number, number, number, number][] = [
-  // 吧台
-  [-9.0, -7.0, -6.2, -4.4],
-  // 吧台后的酒架
-  [-9.4, -7.4, -5.8, -6.9],
+  // 吧台台身（含台面外沿）
+  [BAR.x0 - 0.1, BAR.counterZ - 0.5, BAR.x1 + 0.1, BAR.counterZ + 0.5],
+  // 酒柜
+  [BAR.x0 - 0.2, -7.5, BAR.x1 + 0.2, BAR.backZ + 0.16],
 ]
