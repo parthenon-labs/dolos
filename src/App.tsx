@@ -10,7 +10,7 @@ export default function App() {
       <Canvas
         shadows
         dpr={[1, 2]}
-        camera={{ fov: 64, near: 0.1, far: 40 }}
+        camera={{ fov: 72, near: 0.08, far: 60 }}
         gl={{
           antialias: false, // 交给 EffectComposer 的 multisampling
           toneMapping: THREE.ACESFilmicToneMapping,

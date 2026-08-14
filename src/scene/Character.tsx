@@ -1,15 +1,15 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { getAmp } from '../audio/amplitudes'
-import { seatFacing, seatPosition, TABLE_HEIGHT } from './seats'
-import type { Player } from '../state/useGameStore'
-
-type Props = { player: Player; seatCount: number }
+import { TABLE_HEIGHT, seatFacing, seatLocal } from './hallLayout'
+import type { Occupant } from '../state/useGameStore'
 
 /** 坐姿头部高度。必须明显高于桌面(0.76)，否则角色看起来是陷在桌子里的 */
 const HEAD_Y = 1.2
+/** 超过这个距离就不显示名牌，否则整个大厅飘满字 */
+const LABEL_DISTANCE = 6.5
 
 /**
  * 一个玩家 = 胶囊身体 + 球形头 + 圆锥吻部 + 两只耳朵。
@@ -21,31 +21,41 @@ const HEAD_Y = 1.2
  * 不需要 blendshape、不需要口型同步，也绕开了恐怖谷。
  * 所有表达压到肢体语言上。
  */
-export function Character({ player, seatCount }: Props) {
-  const { seat, color, isLocal } = player
+export function Character({
+  tableId,
+  seat,
+  seatCount,
+  occupant,
+}: {
+  tableId: string
+  seat: number
+  seatCount: number
+  occupant: Occupant
+}) {
   const root = useRef<THREE.Group>(null)
   const head = useRef<THREE.Group>(null)
   const mask = useRef<THREE.MeshStandardMaterial>(null)
+  const [labelVisible, setLabelVisible] = useState(false)
 
   // 每个角色一个固定相位偏移，否则一桌人会同步呼吸，非常假
   const phase = useRef(seat * 1.7 + 0.4)
+  const worldPos = useRef(new THREE.Vector3())
+  const frame = useRef(0)
 
-  useFrame((_, dt) => {
+  useFrame(({ camera }, dt) => {
     if (!root.current || !head.current) return
     const t = performance.now() / 1000 + phase.current
     // 这里直接读模块级内存，不经过 React —— 每帧 setState 会炸掉性能
-    const amp = getAmp(seat)
+    const amp = getAmp(tableId, seat)
 
     // 常态呼吸：非常轻微，但没有它角色会像雕像
     const breath = Math.sin(t * 1.15) * 0.006
-
     // 说话时：头部上下点动 + 身体微微前倾
     const bob = Math.sin(t * 13) * amp * 0.022
     const nod = Math.sin(t * 9.5) * amp * 0.05
 
     head.current.position.y = HEAD_Y + breath + bob
     head.current.rotation.x = nod
-    // 说话时侧头一点点，看起来像在对着人说
     head.current.rotation.z = Math.sin(t * 5) * amp * 0.04
 
     root.current.rotation.x = THREE.MathUtils.damp(
@@ -64,15 +74,21 @@ export function Character({ player, seatCount }: Props) {
         dt,
       )
     }
+
+    // 名牌的距离剔除。每帧算距离没必要，8 帧一次足够
+    frame.current++
+    if (frame.current % 8 === 0) {
+      root.current.getWorldPosition(worldPos.current)
+      const near = camera.position.distanceTo(worldPos.current) < LABEL_DISTANCE
+      if (near !== labelVisible) setLabelVisible(near)
+    }
   })
 
-  // 本地玩家不渲染身体（相机就在他脑袋里），只保留座位占位
-  if (isLocal) return null
-
-  const pos = seatPosition(seat, seatCount)
-
   return (
-    <group position={pos} rotation={[0, seatFacing(seat, seatCount), 0]}>
+    <group
+      position={seatLocal(seat, seatCount)}
+      rotation={[0, seatFacing(seat, seatCount), 0]}
+    >
       <group ref={root}>
         {/* 身体 */}
         <mesh position={[0, 0.66, 0]} castShadow>
@@ -105,8 +121,8 @@ export function Character({ player, seatCount }: Props) {
             <sphereGeometry args={[0.2, 28, 20]} />
             <meshStandardMaterial
               ref={mask}
-              color={color}
-              emissive={color}
+              color={occupant.color}
+              emissive={occupant.color}
               emissiveIntensity={0}
               roughness={0.55}
               metalness={0.1}
@@ -116,7 +132,7 @@ export function Character({ player, seatCount }: Props) {
           {/* 吻部：朝 -Z，也就是朝桌心 */}
           <mesh position={[0, -0.04, -0.17]} rotation={[-Math.PI / 2, 0, 0]} castShadow>
             <coneGeometry args={[0.1, 0.19, 14]} />
-            <meshStandardMaterial color={color} roughness={0.6} />
+            <meshStandardMaterial color={occupant.color} roughness={0.6} />
           </mesh>
 
           {/* 耳朵 */}
@@ -128,7 +144,7 @@ export function Character({ player, seatCount }: Props) {
               castShadow
             >
               <coneGeometry args={[0.055, 0.16, 10]} />
-              <meshStandardMaterial color={color} roughness={0.6} />
+              <meshStandardMaterial color={occupant.color} roughness={0.6} />
             </mesh>
           ))}
 
@@ -140,7 +156,7 @@ export function Character({ player, seatCount }: Props) {
             </mesh>
           ))}
 
-          <NameTag player={player} />
+          {labelVisible && <NameTag occupant={occupant} />}
         </group>
       </group>
     </group>
@@ -148,13 +164,12 @@ export function Character({ player, seatCount }: Props) {
 }
 
 /**
- * 名牌用 drei 的 <Html>（纯 DOM）而不是 3D 文字：
- * 免去字体加载，且以后要加"AI"标记、倒计时、举手图标都方便。
+ * 名牌用 drei 的 <Html>（纯 DOM）而不是 3D 文字：免去字体加载。
+ * 不用 distanceFactor —— 那会让名牌跟着透视缩放，
+ * 近处玩家的名字会大到糊住半个屏幕。名牌是 HUD，该是恒定屏幕尺寸。
  */
-function NameTag({ player }: { player: Player }) {
+function NameTag({ occupant }: { occupant: Occupant }) {
   return (
-    // 不用 distanceFactor：那会让名牌跟着透视缩放，
-    // 近处的玩家名字会大到糊住半个屏幕。名牌是 HUD，该是恒定屏幕尺寸。
     <Html
       position={[0, 0.4, 0]}
       center
@@ -162,8 +177,8 @@ function NameTag({ player }: { player: Player }) {
       style={{ pointerEvents: 'none', userSelect: 'none' }}
     >
       <div className="nametag">
-        {player.name}
-        {player.isAI && <span className="ai-badge">AI</span>}
+        {occupant.name}
+        {occupant.isAI && <span className="ai-badge">AI</span>}
       </div>
     </Html>
   )

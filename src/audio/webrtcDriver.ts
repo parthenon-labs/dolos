@@ -5,11 +5,11 @@
  *
  *   import { attachStream, startWebRTCDriver } from './audio/webrtcDriver'
  *   const stop = startWebRTCDriver()
- *   pc.ontrack = (e) => attachStream(seatOfPeer(e), e.streams[0])
+ *   pc.ontrack = (e) => attachStream(tableId, seat, e.streams[0])
  *
- * 画面那边一行都不用改 —— 两个 driver 写的是同一块 amplitudes 内存。
+ * 画面那边一行都不用改 —— 两个 driver 写的是同一块音量寄存器。
  */
-import { setAmp } from './amplitudes'
+import { ampKey, clearAmp, setAmpByKey } from './amplitudes'
 
 // TS 5.7+ 给 TypedArray 加了 buffer 泛型（Uint8Array<ArrayBuffer>），
 // getByteTimeDomainData 不接受 SharedArrayBuffer 背书的数组。
@@ -23,7 +23,7 @@ type Source = {
 }
 
 let ctx: AudioContext | null = null
-const sources = new Map<number, Source>()
+const sources = new Map<string, Source>()
 
 function audioContext(): AudioContext {
   if (!ctx) ctx = new AudioContext()
@@ -33,7 +33,11 @@ function audioContext(): AudioContext {
 }
 
 /** 把某个座位的远端音轨挂上分析器 */
-export function attachStream(seat: number, stream: MediaStream): void {
+export function attachStream(
+  tableId: string,
+  seat: number,
+  stream: MediaStream,
+): void {
   const ac = audioContext()
   const src = ac.createMediaStreamSource(stream)
   const analyser = ac.createAnalyser()
@@ -43,23 +47,24 @@ export function attachStream(seat: number, stream: MediaStream): void {
   src.connect(analyser)
   // 注意：不要 analyser.connect(ac.destination)，
   // 声音由 <audio> 元素或 SFU 客户端自己播，这里只做分析，否则会双份。
-  sources.set(seat, {
+  sources.set(ampKey(tableId, seat), {
     analyser,
     buf: makeBuf(analyser.fftSize),
     smooth: 0,
   })
 }
 
-export function detachStream(seat: number): void {
-  sources.delete(seat)
-  setAmp(seat, 0)
+export function detachStream(tableId: string, seat: number): void {
+  const k = ampKey(tableId, seat)
+  sources.delete(k)
+  clearAmp(k)
 }
 
 /** 每帧把所有音轨的 RMS 写进音量寄存器 */
 export function startWebRTCDriver(): () => void {
   let raf = 0
   const tick = () => {
-    for (const [seat, s] of sources) {
+    for (const [key, s] of sources) {
       s.analyser.getByteTimeDomainData(s.buf)
       let sum = 0
       for (let i = 0; i < s.buf.length; i++) {
@@ -71,7 +76,7 @@ export function startWebRTCDriver(): () => void {
       const target = Math.min(1, rms * 3.5)
       const k = target > s.smooth ? 0.4 : 0.12
       s.smooth += (target - s.smooth) * k
-      setAmp(seat, s.smooth)
+      setAmpByKey(key, s.smooth)
     }
     raf = requestAnimationFrame(tick)
   }

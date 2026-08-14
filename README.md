@@ -3,56 +3,90 @@
 > Δόλος —— 诡计与欺瞒之灵，普罗米修斯的学徒，造过一尊以假乱真的雕像。
 
 撒谎酒馆风格的第一人称语音牌桌。目标是一个带大厅和房间、可以加 AI 补位的
-在线社交推理游戏；**当前仓库里只有场景骨架**，用来验证一件事：
-在完全没有美术资产的情况下，光照 + 后处理能把一堆胶囊体推到什么程度。
+在线社交推理游戏。
 
-![preview](./preview.png)
+**当前状态：纯前端视觉原型，数据全是 mock。** 没有服务端、没有 WebSocket、
+没有真实语音。存在的意义是先摸清前端视觉的上限——质感不好，玩家看完就退出去了。
+
+![大厅](./shot-hall.png)
+![落座](./shot-seated.png)
 
 ```bash
 npm install
 npm run dev
 ```
 
-## 先做这一件事
+## 玩法
 
-打开页面，右上角 leva 面板里把 **后处理 → 总开关** 关掉再打开。
+点击进入 → `WASD` 在酒吧里走动，鼠标环视 → 准心对准发光的空椅子 →
+`E` 坐下，镜头会推进并收拢到牌桌视角 → `Q` 起身回到大厅。
 
-同样的几何体，关掉是一坨灰塑料，打开是一间酒吧。这就是「氛围的七成在后处理里，
-不在建模里」的意思。接着再拖 **灯光 → 环境光**，往上拖一点点画面立刻垮掉——
-主光和环境光的比值才是戏剧性的来源，宁可暗，不要平。
+## 先做这两件事
+
+**1.** 右上角 leva 面板里把 **后处理 → 总开关** 关掉再打开。同样的几何体，
+关掉是一坨灰塑料，打开是一间酒吧。氛围的七成在后处理里，不在建模里。
+
+**2.** 拖 **大厅光照 → 环境光**，往上拖一点点画面立刻垮掉。主光和环境光的
+比值才是戏剧性的来源，宁可暗，不要平——暗部该由霓虹的彩色补光去填，
+而不是靠白色环境光提亮。
 
 ## 骨架里刻意做对的几件事
 
-**1. 音频和画面之间只有一个接缝**
+**音频和画面之间只有一个接缝**
 
-`src/audio/amplitudes.ts` 是一块模块级的 `Float32Array`。两个 driver 往里写，
-3D 场景从里面读。接真 WebRTC 时只改一行：
+`src/audio/amplitudes.ts` 是一个模块级的 Map，键是 `tableId:seat`。
+fakeDriver（本地假说话数据）和 webrtcDriver（真实音轨走 AnalyserNode 算 RMS）
+都往里写，3D 场景从里面读。接真语音时只改一行：
 
-```ts
-// src/scene/Scene.tsx
+```diff
+  // src/scene/Scene.tsx
 - useEffect(() => startFakeDriver(), [])
 + useEffect(() => startWebRTCDriver(), [])
 ```
 
-然后在拿到远端音轨时 `attachStream(seat, stream)`。场景代码一行不动。
+然后在拿到远端音轨时 `attachStream(tableId, seat, stream)`。场景代码一行不动。
 
-**2. 每帧变化的数据不走 React**
+**每帧变化的数据不走 React**
 
-音量每帧都在变，走 `useState` 会让整棵树每帧重渲染。`Character` 在 `useFrame`
-里直接读那块内存。只有「谁在说话」这种低频状态才降频写进 zustand 给 HUD 用。
-这是 R3F 项目最容易写错、也最容易在 5 个人 + 5 路音频时炸掉的地方。
+音量每帧都在变，走 `useState` 会让整棵树每帧重渲染。角色在 `useFrame` 里直接读
+那块内存；只有「谁在说话」这种低频状态才降频写进 zustand 给 HUD 用。
+这是 R3F 项目最容易写错、也最容易在多桌多路音频下炸掉的地方。
 
-**3. 相机不用 PointerLock**
+**相机只有一个所有者**
 
-牌桌游戏要点牌、点按钮、点玩家，锁指针会让 UI 完全没法用。改成按住拖拽环视，
-视角夹在左右 ±75°、上 18° 下 32°——你是坐着的，不该能转 360°。
-这个限制反而强化了「被困在这张桌子上」的感觉。
+走动、坐下转场、落座环视三种行为全在 `PlayerRig` 里。多个组件同时写
+`camera.position` / `camera.rotation` 会互相打架，而且 bug 极难查。
 
-**4. 动物头套不是风格，是工程决策**
+**走动锁指针，落座解锁**
+
+走动是标准 FPS 手感，必须锁；牌桌上要用光标点牌点按钮，必须解锁。
+坐下转场的第一帧就 `exitPointerLock()`。顺带 FOV 也从 72 收到 60——
+那一下镜头收拢是「坐下」这个动作里很关键的一半。
+
+**动物头套是工程决策，不只是风格**
 
 刚性面具 = 不需要面部绑定、不需要 blendshape、不需要口型同步，还绕开了恐怖谷。
-所有表达压到肢体语言上：头部点动、身体前倾、面具自发光。撒谎酒馆用的就是这一招，
-省下的美术工作量是巨大的。
+所有表达压到肢体语言上：头部点动、身体前倾、面具随音量自发光。
+
+**只给最近的两张桌子开实时阴影**
+
+`ShadowBudget` 每 20 帧按距离重排。每盏 castShadow 的聚光灯都是一次额外的
+场景渲染，四桌全开会明显掉帧，而三米开外的阴影根本看不清。
+
+## 踩过的坑（别再踩一遍）
+
+**光锥着色器吐 NaN，整个画面全黑。** 圆锥顶点处四周的法线在插值中相互抵消，
+长度趋近 0，`normalize()` 产出 NaN。而 NaN 在 HDR 管线里会传染——Bloom 的
+mipmap 降采样把这一个像素抹遍全图。最阴的地方是 **`NaN * 0` 仍是 `NaN`**，
+所以把所有后处理强度调成 0 也救不回来，看起来就像「后处理坏了」。
+修法是 `safeNormalize()` 加长度兜底。见 `src/scene/hall/LightShaft.tsx`。
+
+**`import.meta.env` 需要 `vite/client` 类型。** tsconfig 里显式写了 `types`
+数组的话，会覆盖默认行为，必须手动加进去。
+
+**TS 5.7+ 收紧了 TypedArray 泛型**，`getByteTimeDomainData` 不接受
+SharedArrayBuffer 背书的数组。用 `ReturnType<typeof makeBuf>` 推导，
+新旧 TS 都能编过。见 `src/audio/webrtcDriver.ts`。
 
 ## 目录
 
@@ -62,32 +96,51 @@ src/
     amplitudes.ts     音量寄存器 —— 声音和画面唯一的接缝
     fakeDriver.ts     假说话数据，零配置看效果。上线前删掉
     webrtcDriver.ts   真实音轨 → AnalyserNode → RMS
+  player/
+    PlayerRig.tsx     相机的唯一所有者：走动 / 转场 / 落座
+    SeatPicker.tsx    屏幕中心射线找空位 + 坐下起身按键
+    seatRegistry.ts   座位命中体注册表
   scene/
-    seats.ts          座位布局，所有位置的唯一真相来源
-    Scene.tsx         场景装配
-    CameraRig.tsx     坐姿第一人称，拖拽环视 + 呼吸摇晃
+    hallLayout.ts     大厅与座位布局，所有位置的唯一真相来源
+    Scene.tsx         场景装配 + 阴影预算
     Character.tsx     胶囊体角色，音量驱动动作
-    Room.tsx          房间、桌子、吊灯、牌、说话指示环
-    Lighting.tsx      布光（氛围的地基）
-    Effects.tsx       后处理栈（氛围的七成）
-  state/useGameStore.ts   玩家列表 + 当前说话人
-  ui/Hud.tsx              2D UI，和 3D 吃同一个 store
+    Lighting.tsx      大厅级光照与雾
+    Effects.tsx       后处理栈
+    hall/
+      Hall.tsx        地板（反射）、墙、吧台、霓虹、横梁
+      TableUnit.tsx   一张桌子的全部：桌体 / 吊灯 / 椅子 / 人 / 牌
+      Seat.tsx        椅子 + 命中体 + 空位指示光圈
+      LightShaft.tsx  假体积光锥
+      DustMotes.tsx   空气浮尘
+  state/
+    useGameStore.ts   桌子占用情况（mock）
+    usePlayerStore.ts 玩家模式状态机
+  ui/Hud.tsx          准心、坐下提示、同桌玩家列表
 ```
 
-## 下一步的顺序
+开发期控制台里有 `window.__dolos`，可以直接驱动和检查状态：
 
-1. **状态驱动的动画编排** —— 出牌、翻牌、投票。全是位置动画，不需要骨骼。
+```js
+__dolos.player.getState().beginSit({ tableId: 't4', seat: 1 })
+__dolos.game.getState().occupancy
+__dolos.scene   // three.js scene
+__dolos.camera
+```
+
+## 下一步
+
+1. **状态驱动的动画编排**——出牌、翻牌、投票。全是位置动画，不需要骨骼。
    这一步会暴露真正的难点：服务端事件到了，但上一个动画还没播完怎么办。
-2. **接 WebSocket**，让 `useGameStore` 由服务端事件驱动而不是写死的 PRESET。
+2. **接 WebSocket**，让 store 由服务端事件驱动而不是 mock。
 3. **接 WebRTC**，换掉 fakeDriver。
 4. **最后**才换 glTF 模型。倒过来做（先啃模型）是单人项目最常见的死法。
 
-## 已知的偷懒
+## 已知的偷懒 / 待决策
 
-- 本地玩家（座位 0）不渲染身体，相机就在他脑袋里。以后要加自己的手和牌。
-- 侧面两个座位会有一半在画面外，需要转头才看得全。这是 5 人圆桌 + 第一人称的
-  固有问题，撒谎酒馆只有 4 人所以不明显。要么减到 4 人，要么把座位排成扇形而不是整圆。
-- 实时阴影只有吊灯那一盏。真做美术时这些静态物体的光照应该在 Blender 里烤成贴图。
-- 移动端没测。WebGL + 多路 WebRTC 音频解码在中端手机上会烫，需要一个关掉全部
-  后处理的低画质档。
-```
+- **5 人以上圆桌 + 第一人称，侧面玩家必然出画。** 撒谎酒馆只有 4 人所以不明显，
+  阿瓦隆最少 5 人。要么减到 4 人一桌，要么把座位排成弧形而不是整圆。**这个越晚改代价越大。**
+- 落座后看不到自己的手和牌。
+- 静态几何体的光照应该在 Blender 里烤成贴图，现在全是实时的。
+- 移动端没测。WebGL + 多路 WebRTC 音频解码在中端手机上会烫，需要一个
+  关掉全部后处理的低画质档。
+- 打包 1.27MB（gzip 363KB），没做代码分割。

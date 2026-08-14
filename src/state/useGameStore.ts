@@ -1,33 +1,76 @@
 import { create } from 'zustand'
-import { NUM_SEATS } from '../audio/amplitudes'
+import { TABLES } from '../scene/hallLayout'
 
-export type Player = {
-  seat: number
+export type Occupant = {
   name: string
   /** 面具主色 */
   color: string
-  isLocal: boolean
   isAI: boolean
 }
 
+/** tableId -> (座位号 -> 占用者 | null) */
+export type Occupancy = Record<string, (Occupant | null)[]>
+
 type GameState = {
-  players: Player[]
-  /** 当前音量最大的座位，-1 表示无人说话。由 SpeakerTracker 低频写入 */
-  speaking: number
-  setSpeaking: (seat: number) => void
+  occupancy: Occupancy
+  /** 全局音量最大的座位，格式 "tableId:seat"；无人说话为 null */
+  speakingKey: string | null
+  setSpeakingKey: (k: string | null) => void
+  /** 玩家坐下 / 起身时占位 */
+  claimSeat: (tableId: string, seat: number, who: Occupant | null) => void
 }
 
-const PRESET: Omit<Player, 'seat'>[] = [
-  { name: '你',     color: '#c9a227', isLocal: true,  isAI: false },
-  { name: 'Foxy',   color: '#c1502e', isLocal: false, isAI: false },
-  { name: 'Bristle',color: '#b9737d', isLocal: false, isAI: true  },
-  { name: 'Toar',   color: '#4a5d63', isLocal: false, isAI: true  },
-  { name: 'Scubby', color: '#7a5c3e', isLocal: false, isAI: false },
-]
+const NAMES = [
+  ['Foxy', '#c1502e'],
+  ['Bristle', '#b9737d'],
+  ['Toar', '#4a5d63'],
+  ['Scubby', '#7a5c3e'],
+  ['Marlow', '#6d6a94'],
+  ['Pella', '#9a6b3f'],
+  ['Vex', '#3f6b5a'],
+  ['Gundy', '#8c5a5a'],
+] as const
+
+/**
+ * Mock 占用数据。刻意留出空位，且每张桌子空的数量不同 ——
+ * 走进大厅要一眼看出「哪桌能坐」。
+ */
+function mockOccupancy(): Occupancy {
+  // 每张桌子哪些座位是空的
+  const emptyBySeat: Record<string, number[]> = {
+    t1: [0, 3],
+    t2: [2],
+    t3: [0, 1, 4],
+    t4: [1, 2, 3],
+  }
+  let cursor = 0
+  const out: Occupancy = {}
+  for (const t of TABLES) {
+    const empties = emptyBySeat[t.id] ?? []
+    out[t.id] = Array.from({ length: t.seats }, (_, i) => {
+      if (empties.includes(i)) return null
+      const [name, color] = NAMES[cursor % NAMES.length]
+      cursor++
+      // 大约每三个里有一个是 AI
+      return { name, color, isAI: cursor % 3 === 0 }
+    })
+  }
+  return out
+}
 
 export const useGameStore = create<GameState>((set) => ({
-  players: PRESET.slice(0, NUM_SEATS).map((p, seat) => ({ ...p, seat })),
-  speaking: -1,
-  setSpeaking: (seat) =>
-    set((s) => (s.speaking === seat ? s : { speaking: seat })),
+  occupancy: mockOccupancy(),
+  speakingKey: null,
+  setSpeakingKey: (k) =>
+    set((s) => (s.speakingKey === k ? s : { speakingKey: k })),
+  claimSeat: (tableId, seat, who) =>
+    set((s) => {
+      const table = s.occupancy[tableId]
+      if (!table) return s
+      const next = table.slice()
+      next[seat] = who
+      return { occupancy: { ...s.occupancy, [tableId]: next } }
+    }),
 }))
+
+export const seatKey = (tableId: string, seat: number) => `${tableId}:${seat}`
