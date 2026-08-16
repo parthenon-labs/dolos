@@ -41,9 +41,11 @@ function Slabs() {
               <boxGeometry args={[w, SLAB, d]} />
               <meshStandardMaterial color="#1d1410" roughness={0.92} />
             </mesh>
-            {/* 上表面单独铺一层地板色，和楼下地面区分开 */}
+            {/* 上表面单独铺一层地板色，和楼下地面区分开。
+                抬高 8mm 而不是 2mm —— 掠射角下 2mm 的间距不够深度缓冲分辨，
+                照样会闪，跟楼梯是同一类问题 */}
             <mesh
-              position={[(x0 + x1) / 2, FLOOR2_Y + 0.002, (z0 + z1) / 2]}
+              position={[(x0 + x1) / 2, FLOOR2_Y + 0.008, (z0 + z1) / 2]}
               rotation={[-Math.PI / 2, 0, 0]}
               receiveShadow
             >
@@ -136,19 +138,30 @@ function Staircase() {
 
   return (
     <group>
+      {/*
+        踏板和踢面必须**互相插进去一点**，不能刚好贴合。
+        第一版是严丝合缝的：踢面顶正好等于踏板顶、踢面前脸正好等于踏板前脸、
+        踏板侧面正好等于梯帮内侧 —— 三组完全共面的表面。
+        共面的两个面在 GPU 眼里深度相同，每个像素靠浮点误差决定谁在前，
+        镜头一动就来回翻，于是整段楼梯在转视角时疯狂闪烁（z-fighting）。
+        故意重叠一两厘米，谁在前就有了确定答案。
+      */}
       {Array.from({ length: steps }, (_, i) => {
         const z = zBottom - i * run - run / 2
         const y = (i + 1) * rise
         return (
           <group key={i}>
-            {/* 踏板 */}
+            {/* 踏板：左右各外扩 2cm，插进两侧梯帮里 */}
             <mesh position={[cx, y - 0.025, z]} castShadow receiveShadow>
-              <boxGeometry args={[width, 0.05, run + 0.04]} />
-              <meshStandardMaterial color="#33221600" roughness={0.7} />
+              <boxGeometry args={[width + 0.04, 0.05, run + 0.03]} />
+              <meshStandardMaterial color="#332216" roughness={0.7} />
             </mesh>
-            {/* 踢面 */}
-            <mesh position={[cx, y - rise / 2, z + run / 2]} receiveShadow>
-              <boxGeometry args={[width, rise, 0.04]} />
+            {/* 踢面：上端插进本级踏板，下端插进下一级踏板，Z 向再往里收 2cm */}
+            <mesh
+              position={[cx, y - rise / 2 - 0.03, z + run / 2 - 0.02]}
+              receiveShadow
+            >
+              <boxGeometry args={[width, rise - 0.02, 0.04]} />
               <meshStandardMaterial color="#1d1410" roughness={0.9} />
             </mesh>
           </group>
