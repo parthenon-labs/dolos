@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { useControls } from 'leva'
 import * as THREE from 'three'
 import {
   BOX_OBSTACLES,
@@ -39,6 +40,13 @@ const WALK_PITCH = THREE.MathUtils.degToRad(72)
 
 const LOOK_SPEED = 0.0026
 
+/** 自动转向的跟随速度。太快像被拽着走，太慢转弯会甩出去 */
+const TURN_RATE = 4.5
+/** 速度低于这个值就不再更新朝向，否则停步瞬间方向向量抖动会让镜头乱甩 */
+const FACE_THRESHOLD = 0.4
+/** 点击寻路的到达判定半径 */
+const ARRIVE_RADIUS = 0.45
+
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 
@@ -60,6 +68,18 @@ export function PlayerRig() {
   const seatedAt = usePlayerStore((s) => s.seatedAt)
   const finishSit = usePlayerStore((s) => s.finishSit)
   const finishStand = usePlayerStore((s) => s.finishStand)
+  const moveTarget = usePlayerStore((s) => s.moveTarget)
+  const setMoveTarget = usePlayerStore((s) => s.setMoveTarget)
+
+  const ctrl = useControls('操作', {
+    autoFace: { value: true, label: '自动转向' },
+  })
+  const autoFace = useRef(ctrl.autoFace)
+  autoFace.current = ctrl.autoFace
+
+  const moveTargetRef = useRef(moveTarget)
+  moveTargetRef.current = moveTarget
+  const stuckFrames = useRef(0)
 
   // 位置只维护水平分量，脚下标高单独算
   // 出生在南端入口，yaw=0 面朝 -Z，也就是望穿整条大厅。
@@ -284,9 +304,6 @@ export function PlayerRig() {
   })
 
   function stepWalking(dt: number) {
-    yaw.current = THREE.MathUtils.damp(yaw.current, targetYaw.current, 22, dt)
-    pitch.current = THREE.MathUtils.damp(pitch.current, targetPitch.current, 22, dt)
-
     const k = keys.current
     let ix = 0
     let iz = 0
@@ -294,24 +311,78 @@ export function PlayerRig() {
     if (k['KeyS'] || k['ArrowDown']) iz += 1
     if (k['KeyA'] || k['ArrowLeft']) ix -= 1
     if (k['KeyD'] || k['ArrowRight']) ix += 1
+    const hasKeys = ix !== 0 || iz !== 0
 
-    // 输入向量绕 yaw 旋转到世界方向。
-    //
-    // 绕 Y 轴旋转 (vx, vz) 的正确形式是：
-    //   x' = vx*cos + vz*sin
-    //   z' = -vx*sin + vz*cos
-    // 校验：W 给 (0,-1) → (-sin, -cos)，正是 yaw 对应的前方（three 里 -Z 为前）。
-    // A 给 (-1,0) → (-cos, sin)，正是左方。
+    // 有键盘输入就取消点击寻路 —— 手动永远优先
+    if (hasKeys && moveTargetRef.current) setMoveTarget(null)
+
     tmp.set(0, 0)
-    if (ix !== 0 || iz !== 0) {
-      const len = Math.hypot(ix, iz)
-      const nx = ix / len
-      const nz = iz / len
-      const c = Math.cos(yaw.current)
-      const s = Math.sin(yaw.current)
-      tmp.set(nx * c + nz * s, -nx * s + nz * c)
-      tmp.multiplyScalar(WALK_SPEED)
+
+    if (hasKeys) {
+      if (autoFace.current) {
+        // 自动转向模式下，WASD 是**世界方向**而不是相对镜头。
+        // 必须如此：如果 A 表示"相对镜头往左"，而镜头又会转去朝向移动方向，
+        // 两者会互相追着跑，人会原地打转。
+        // 世界方向 + 镜头跟随，是唯一稳定的组合。
+        const len = Math.hypot(ix, iz)
+        tmp.set((ix / len) * WALK_SPEED, (iz / len) * WALK_SPEED)
+      } else {
+        // 手动转向模式：输入向量绕 yaw 旋转到世界方向。
+        //   x' = vx*cos + vz*sin
+        //   z' = -vx*sin + vz*cos
+        // 校验：W 给 (0,-1) → (-sin, -cos)，正是 yaw 对应的前方（three 里 -Z 为前）。
+        const len = Math.hypot(ix, iz)
+        const nx = ix / len
+        const nz = iz / len
+        const c = Math.cos(yaw.current)
+        const s = Math.sin(yaw.current)
+        tmp.set(nx * c + nz * s, -nx * s + nz * c)
+        tmp.multiplyScalar(WALK_SPEED)
+      }
+    } else if (moveTargetRef.current) {
+      // 朝点击的目的地直走。没有寻路，撞到东西会沿着障碍滑 ——
+      // 一个开阔的厅里够用了，真要绕柱子再说。
+      const [tx, tz] = moveTargetRef.current
+      const dx = tx - pos.current.x
+      const dz = tz - pos.current.y
+      const dist = Math.hypot(dx, dz)
+      if (dist < ARRIVE_RADIUS) {
+        setMoveTarget(null)
+        stuckFrames.current = 0
+      } else {
+        // 快到了就减速，否则会冲过头再倒回来，很难看
+        const speed = WALK_SPEED * Math.min(1, dist / 1.2)
+        tmp.set((dx / dist) * speed, (dz / dist) * speed)
+        // 卡住检测：贴着墙原地蹭的时候直接放弃，别让玩家一直顶着
+        if (vel.current.lengthSq() < 0.15) {
+          stuckFrames.current++
+          if (stuckFrames.current > 45) {
+            setMoveTarget(null)
+            stuckFrames.current = 0
+          }
+        } else stuckFrames.current = 0
+      }
     }
+
+    // 自动转向：镜头平滑地转到"正在走的方向"。
+    // 阈值是为了在停下时保持朝向 —— 速度掉到 0 时方向向量会抖，
+    // 不设阈值镜头会在停步瞬间乱甩。
+    if (autoFace.current && !dragging.current) {
+      const v = vel.current
+      if (v.lengthSq() > FACE_THRESHOLD * FACE_THRESHOLD) {
+        // forward = (-sin y, -cos y)，反解出 y
+        const want = Math.atan2(-v.x, -v.y)
+        targetYaw.current = nearestAngle(targetYaw.current, want)
+      }
+    }
+
+    yaw.current = THREE.MathUtils.damp(
+      yaw.current,
+      targetYaw.current,
+      autoFace.current && !dragging.current ? TURN_RATE : 22,
+      dt,
+    )
+    pitch.current = THREE.MathUtils.damp(pitch.current, targetPitch.current, 22, dt)
 
     // 加速度而不是直接赋值 —— 瞬间启停的移动手感很廉价
     vel.current.x = THREE.MathUtils.damp(vel.current.x, tmp.x, ACCEL, dt)

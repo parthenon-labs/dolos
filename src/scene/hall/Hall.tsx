@@ -3,6 +3,7 @@ import { MeshReflectorMaterial } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { BAR, FLOOR2_Y, HALL } from '../hallLayout'
+import { usePlayerStore } from '../../state/usePlayerStore'
 import { DustMotes } from './DustMotes'
 import { Mezzanine } from './Mezzanine'
 
@@ -108,8 +109,20 @@ function Chandelier({
  * resolution 压到 512 + 高 blur：反正要糊，没必要渲染清晰的镜像。
  */
 function Floor() {
+  const setMoveTarget = usePlayerStore((s) => s.setMoveTarget)
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+    <mesh
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, 0, 0]}
+      receiveShadow
+      onClick={(e) => {
+        // e.delta 是按下到抬起之间指针移动的像素数。
+        // 拖拽转视角时不该顺带下达一个"走过去"的指令。
+        if (e.delta > 4) return
+        e.stopPropagation()
+        setMoveTarget([e.point.x, e.point.z])
+      }}
+    >
       <planeGeometry args={[HALL.width, HALL.depth]} />
       <MeshReflectorMaterial
         resolution={512}

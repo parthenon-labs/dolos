@@ -22,8 +22,12 @@ type PlayerState = {
    */
   entered: boolean
 
+  /** 点地板设的目的地（世界平面坐标），到达或被 WASD 打断就清空 */
+  moveTarget: [number, number] | null
+
   setHovered: (s: SeatRef | null) => void
   setEntered: (v: boolean) => void
+  setMoveTarget: (t: [number, number] | null) => void
   beginSit: (s: SeatRef) => void
   finishSit: () => void
   beginStand: () => void
@@ -35,6 +39,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   seatedAt: null,
   hovered: null,
   entered: false,
+  moveTarget: null,
 
   setHovered: (s) =>
     set((prev) => {
@@ -46,9 +51,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   setEntered: (v) => set((p) => (p.entered === v ? p : { entered: v })),
 
+  setMoveTarget: (t) => set({ moveTarget: t }),
+
   beginSit: (s) => {
     if (get().mode !== 'walking') return
-    set({ mode: 'sitting-down', seatedAt: s, hovered: null })
+    set({ mode: 'sitting-down', seatedAt: s, hovered: null, moveTarget: null })
   },
   finishSit: () => set({ mode: 'seated' }),
 

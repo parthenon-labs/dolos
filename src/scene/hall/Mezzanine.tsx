@@ -6,6 +6,7 @@ import {
   SLAB,
   STAIRS,
 } from '../hallLayout'
+import { usePlayerStore } from '../../state/usePlayerStore'
 
 /**
  * 二层挑台、栏杆和楼梯。
@@ -26,6 +27,7 @@ export function Mezzanine() {
 
 /** 楼板。上表面在 FLOOR2_Y，厚度向下长，底面就是一层的天花 */
 function Slabs() {
+  const setMoveTarget = usePlayerStore((s) => s.setMoveTarget)
   return (
     <group>
       {MEZZ_RECTS.map(([x0, z0, x1, z1], i) => {
@@ -48,6 +50,12 @@ function Slabs() {
               position={[(x0 + x1) / 2, FLOOR2_Y + 0.008, (z0 + z1) / 2]}
               rotation={[-Math.PI / 2, 0, 0]}
               receiveShadow
+              onClick={(e) => {
+                // 二楼地面同样可以点着走
+                if (e.delta > 4) return
+                e.stopPropagation()
+                setMoveTarget([e.point.x, e.point.z])
+              }}
             >
               <planeGeometry args={[w, d]} />
               <meshStandardMaterial color="#2b1d14" roughness={0.86} />

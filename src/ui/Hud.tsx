@@ -25,7 +25,7 @@ export function Hud() {
         <div className="hud-title">DOLOS</div>
         <div className="hud-sub">
           {mode === 'walking'
-            ? 'WASD 移动 · 按住拖拽环视 · 指向空位按 E 或点击坐下'
+            ? 'WASD 移动 · 点地面走过去 · 镜头自动转向 · 指向空位按 E 或点击坐下'
             : mode === 'seated'
               ? '按住拖拽环视 · Q 起身'
               : ''}

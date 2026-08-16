@@ -140,6 +140,9 @@ export function Seat({
           if (isHovered) setHovered(null)
         }}
         onClick={(e) => {
+          // 够不着或已有人时不拦截事件，让这一下点击穿过去落到地板上，
+          // 变成"走过去"的指令 —— 对着占着的椅子点一下毫无反应最劝退
+          if (!selectable || !inReach.current) return
           e.stopPropagation()
           sit()
         }}
