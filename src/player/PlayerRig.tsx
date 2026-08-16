@@ -18,7 +18,7 @@ import {
 } from '../scene/hallLayout'
 import { usePlayerStore } from '../state/usePlayerStore'
 
-const WALK_SPEED = 3.1
+// 移动 / 转向速度都挪到 leva 里可调了，这里只留加速度
 const ACCEL = 14
 const SIT_DURATION = 1.15
 const STAND_DURATION = 0.85
@@ -71,21 +71,31 @@ export function PlayerRig() {
   const moveTarget = usePlayerStore((s) => s.moveTarget)
   const setMoveTarget = usePlayerStore((s) => s.setMoveTarget)
 
-  const ctrl = useControls('操作', {
+  /**
+   * 手感参数全部开放成滑块。
+   * "难受"是很难靠猜去修的 —— 与其我一轮轮改默认值，不如让人当场拖到舒服为止。
+   */
+  const ctrl = useControls('手感', {
     steering: {
-      value: 'turn',
+      value: 'strafe',
       options: {
-        'A/D 转向 · W/S 前后': 'turn',
-        'WASD 平移 · 拖拽转视角': 'strafe',
+        'WASD 平移 · ←→ 转向': 'strafe',
+        'A/D 转向 · Q/E 侧移': 'turn',
       },
       label: '操作方式',
     },
-    turnSpeed: { value: 2.2, min: 0.8, max: 5, step: 0.1, label: '转向速度' },
+    walkSpeed: { value: 2.8, min: 1.2, max: 5, step: 0.1, label: '移动速度' },
+    turnSpeed: { value: 3.2, min: 1, max: 7, step: 0.1, label: '转向速度' },
+    bob: { value: 0.6, min: 0, max: 2, step: 0.05, label: '头部晃动' },
   })
   const steering = useRef(ctrl.steering)
   steering.current = ctrl.steering
   const turnSpeed = useRef(ctrl.turnSpeed)
   turnSpeed.current = ctrl.turnSpeed
+  const walkSpeed = useRef(ctrl.walkSpeed)
+  walkSpeed.current = ctrl.walkSpeed
+  const bobAmount = useRef(ctrl.bob)
+  bobAmount.current = ctrl.bob
 
   const moveTargetRef = useRef(moveTarget)
   moveTargetRef.current = moveTarget
@@ -316,19 +326,22 @@ export function PlayerRig() {
   function stepWalking(dt: number) {
     const k = keys.current
     const turnMode = steering.current === 'turn'
+    const SPEED = walkSpeed.current
 
-    // 一次算清这一帧的前后 / 左右意图。
-    // turn 模式：A/D 是转向，横向平移交给 Q/E（微调站位时才用得上）
-    // strafe 模式：A/D 是平移，转向靠拖拽鼠标
+    // 一次算清这一帧的前后 / 转向 / 侧移三种意图。
+    //
+    // 默认（strafe）：WASD 还是最熟悉的那套 —— W/S 前后、A/D 侧移，
+    // 转向交给方向键 ←→，所以键盘依然能独立控制方向，不用碰鼠标。
+    // 这样在满是桌子的厅里挪位置不用"转身-走-再转回来"。
+    // 可选（turn）：老式坦克操作，A/D 转向、Q/E 侧移。
     const fwd =
       (k['KeyW'] || k['ArrowUp'] ? 1 : 0) - (k['KeyS'] || k['ArrowDown'] ? 1 : 0)
-    const turn =
-      turnMode
-        ? (k['KeyA'] || k['ArrowLeft'] ? 1 : 0) - (k['KeyD'] || k['ArrowRight'] ? 1 : 0)
-        : 0
+    const turn = turnMode
+      ? (k['KeyA'] || k['ArrowLeft'] ? 1 : 0) - (k['KeyD'] || k['ArrowRight'] ? 1 : 0)
+      : (k['ArrowLeft'] ? 1 : 0) - (k['ArrowRight'] ? 1 : 0)
     const strafe = turnMode
       ? (k['KeyE'] ? 1 : 0) - (k['KeyQ'] ? 1 : 0)
-      : (k['KeyD'] || k['ArrowRight'] ? 1 : 0) - (k['KeyA'] || k['ArrowLeft'] ? 1 : 0)
+      : (k['KeyD'] ? 1 : 0) - (k['KeyA'] ? 1 : 0)
 
     const hasKeys = fwd !== 0 || turn !== 0 || strafe !== 0
     // 有键盘输入就取消点击寻路 —— 手动永远优先
@@ -351,7 +364,7 @@ export function PlayerRig() {
       const vx = -s * fwd + c * strafe
       const vz = -c * fwd - s * strafe
       const len = Math.hypot(vx, vz)
-      tmp.set((vx / len) * WALK_SPEED, (vz / len) * WALK_SPEED)
+      tmp.set((vx / len) * SPEED, (vz / len) * SPEED)
     } else if (moveTargetRef.current) {
       // 朝点击的目的地直走。没有寻路，撞到东西会沿着障碍滑 ——
       // 一个开阔的厅里够用了，真要绕柱子再说。
@@ -364,7 +377,7 @@ export function PlayerRig() {
         stuckFrames.current = 0
       } else {
         // 快到了就减速，否则会冲过头再倒回来，很难看
-        const speed = WALK_SPEED * Math.min(1, dist / 1.2)
+        const speed = SPEED * Math.min(1, dist / 1.2)
         tmp.set((dx / dist) * speed, (dz / dist) * speed)
       }
     }
@@ -429,12 +442,20 @@ export function PlayerRig() {
     // 上下楼梯时把标高做平滑，否则每级台阶都会顿一下
     smoothY.current = THREE.MathUtils.damp(smoothY.current, groundY.current, 16, dt)
 
-    // 走路头部起伏，速度越快越明显
+    /*
+      走路头部起伏。
+
+      翻滚原本写的是 cos(phase * 0.5) —— 半频，也就是左右摇的周期是上下起伏的
+      两倍，走起来像喝多了在踉跄。真实的步态里这两者是同频的（每一步一次
+      起伏、一次侧倾），所以改成同频并且压小幅度。
+      整体强度做成可调，晕 3D 的人可以直接拉到 0。
+    */
     const speed = vel.current.length()
     bobPhase.current += dt * speed * 3.4
-    const ratio = Math.min(1, speed / WALK_SPEED)
-    const bob = Math.sin(bobPhase.current) * 0.028 * ratio
-    const roll = Math.cos(bobPhase.current * 0.5) * 0.007 * ratio
+    const ratio = Math.min(1, speed / Math.max(0.1, SPEED))
+    const amp = bobAmount.current * ratio
+    const bob = Math.sin(bobPhase.current) * 0.022 * amp
+    const roll = Math.sin(bobPhase.current) * 0.004 * amp
 
     camera.position.set(
       pos.current.x,

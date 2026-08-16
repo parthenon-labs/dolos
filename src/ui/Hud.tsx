@@ -25,7 +25,7 @@ export function Hud() {
         <div className="hud-title">DOLOS</div>
         <div className="hud-sub">
           {mode === 'walking'
-            ? 'W/S 前后 · A/D 转向 · Q/E 侧移 · 点地面走过去 · 空位按 E 坐下'
+            ? 'WASD 移动 · ←→ 转向 · 点地面走过去 · 空位按 E 坐下 · 手感可在右上角调'
             : mode === 'seated'
               ? '按住拖拽环视 · Q 起身'
               : ''}
@@ -78,11 +78,13 @@ function ClickToStart() {
         <div className="start-keys">
           <span>
             <kbd>W</kbd>
-            <kbd>S</kbd> 前后
+            <kbd>A</kbd>
+            <kbd>S</kbd>
+            <kbd>D</kbd> 移动
           </span>
           <span>
-            <kbd>A</kbd>
-            <kbd>D</kbd> 转向
+            <kbd>←</kbd>
+            <kbd>→</kbd> 转向
           </span>
           <span>点地面 走过去</span>
           <span>
