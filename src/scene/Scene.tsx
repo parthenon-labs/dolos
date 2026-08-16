@@ -11,6 +11,7 @@ import { Hall } from './hall/Hall'
 import { TableUnit } from './hall/TableUnit'
 import { Effects } from './Effects'
 import { Lighting } from './Lighting'
+import { LightBudget } from './LightBudget'
 
 export function Scene() {
   // 接真 WebRTC 时，把这一段换成：
@@ -26,6 +27,7 @@ export function Scene() {
       <Lighting />
       <Hall />
       <ShadowBudget />
+      <LightBudget />
       <SpeakerTracker />
       <Effects />
       {import.meta.env.DEV && <DevHandle />}

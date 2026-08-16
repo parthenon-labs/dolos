@@ -191,6 +191,7 @@ function Staircase() {
 
       {/* 楼梯脚下一盏地灯，把入口点出来 —— 玩家得看得见"这里能上去" */}
       <pointLight
+        userData={{ budget: 'point' }}
         position={[cx, 0.5, zBottom + 0.4]}
         intensity={3.2}
         color="#ffb257"

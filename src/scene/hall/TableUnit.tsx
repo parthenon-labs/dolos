@@ -134,6 +134,7 @@ function Lamp({ castShadows }: { castShadows: boolean }) {
       <object3D ref={target} position={[0, TABLE_HEIGHT, 0]} />
       <spotLight
         ref={spot}
+        userData={{ budget: 'spot' }}
         position={[0, 2.22, 0]}
         angle={1.15}
         penumbra={0.8}
@@ -146,8 +147,11 @@ function Lamp({ castShadows }: { castShadows: boolean }) {
         shadow-bias={-0.0012}
         shadow-normalBias={0.02}
       />
-      {/* 极弱的桌下反弹光，避免下半身死黑 */}
-      <pointLight position={[0, 0.25, 0]} intensity={1.1} color="#8a5a2e" distance={3.4} decay={2} />
+      {/*
+        原来这里还有一盏"桌下反弹光"补下半身的死黑。八张桌子就是八盏，
+        性价比太差 —— 删掉之后靠环境光补回来，画面差别几乎看不出。
+        每加一件家具就顺手挂一盏灯，是这个场景掉到 9 FPS 的直接原因。
+      */}
     </group>
   )
 }

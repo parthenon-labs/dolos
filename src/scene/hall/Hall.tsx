@@ -95,7 +95,7 @@ function Chandelier({
         )
       })}
       {/* 单个点光源代表整圈蜡烛 —— 八个真光源太贵，观感差别很小 */}
-      <pointLight position={[0, 0.1, 0]} intensity={11} color="#ffb257" distance={13} decay={2} />
+      <pointLight userData={{ budget: 'point' }} position={[0, 0.1, 0]} intensity={11} color="#ffb257" distance={13} decay={2} />
     </group>
   )
 }
@@ -238,6 +238,7 @@ function CounterBody({ width }: { width: number }) {
         <meshBasicMaterial color="#ff9d4a" toneMapped={false} />
       </mesh>
       <pointLight
+        userData={{ budget: 'point' }}
         position={[0, BAR.counterH - 0.1, BAR.counterZ + 0.6]}
         intensity={4}
         color="#ff9d4a"
@@ -313,6 +314,7 @@ function BeerTaps({ x }: { x: number }) {
 /** 酒柜：背板 + 三层层板 + 站在层板上的酒瓶 + 每层的背光灯带 */
 function BackBar({ width }: { width: number }) {
   const shelfY = [1.16, 1.63, 2.1]
+  const group = useRef<THREE.Group>(null)
 
   const bottles = useMemo(() => {
     // 深、脏、低饱和。高饱和亮色在近距离配合 Bloom 会糊成一排发光的糖果 ——
@@ -322,35 +324,39 @@ function BackBar({ width }: { width: number }) {
       '#7a6a2c', '#41603a', '#7a3f22', '#4a3a63',
     ]
     const out: {
-      x: number; y: number; h: number; r: number; color: string; slim: boolean
+      x: number; y: number; profile: THREE.Vector2[]; color: string
     }[] = []
     shelfY.forEach((y, si) => {
       // 每层瓶距略有差别，整齐等距看起来像货架不像酒吧
-      const gap = 0.2 + si * 0.022
+      const gap = 0.26 + si * 0.03
       const n = Math.floor((width - 0.5) / gap)
       for (let i = 0; i < n; i++) {
         // 用确定性的伪随机，避免每次渲染瓶子乱跳
         const seed = Math.sin((si * 37 + i * 11.7) * 1.7) * 0.5 + 0.5
         const seed2 = Math.sin((si * 13 + i * 5.3) * 3.1) * 0.5 + 0.5
+        const h = 0.19 + seed * 0.13
+        const r = 0.033 + seed2 * 0.016
         out.push({
           x: -width / 2 + 0.26 + i * gap + (seed - 0.5) * 0.03,
           y: y + 0.03,
-          h: 0.19 + seed * 0.13,
-          r: 0.033 + seed2 * 0.016,
+          profile: bottleProfile(r, h),
           color: palette[(si * 3 + i) % palette.length],
-          slim: seed2 > 0.6,
         })
       }
     })
     return out
   }, [width])
 
-  const glass = {
-    roughness: 0.28,
-    metalness: 0.1,
-    transparent: true,
-    opacity: 0.88,
-  }
+  // 离得远就整柜关掉。酒柜在挑台阴影里，隔着十几米加上雾，
+  // 有没有酒瓶根本看不出来，但它是全场 mesh 数量的大头。
+  useFrame(({ camera }) => {
+    if (!group.current) return
+    const p = group.current.parent
+    if (!p) return
+    const d = camera.position.distanceTo(p.getWorldPosition(tmpVec))
+    const on = d < 16
+    if (group.current.visible !== on) group.current.visible = on
+  })
 
   return (
     <group>
@@ -374,45 +380,60 @@ function BackBar({ width }: { width: number }) {
             <boxGeometry args={[width - 0.5, 0.012, 0.015]} />
             <meshBasicMaterial color={i === 1 ? '#5ad6c0' : '#ffb257'} toneMapped={false} />
           </mesh>
-          <pointLight
-            position={[0, y + 0.12, BAR.backZ + 0.12]}
-            intensity={1.0}
-            color={i === 1 ? '#5ad6c0' : '#ffb257'}
-            distance={2.2}
-            decay={2}
-          />
-        </group>
-      ))}
-
-      {bottles.map((b, i) => (
-        <group key={i} position={[b.x, b.y, BAR.backZ]}>
-          <mesh position={[0, b.h / 2, 0]} castShadow>
-            <cylinderGeometry args={[b.r, b.r * 1.04, b.h, 12]} />
-            <meshStandardMaterial color={b.color} {...glass} />
-          </mesh>
-          <mesh position={[0, b.h + 0.025, 0]} castShadow>
-            <cylinderGeometry args={[b.r * 0.42, b.r, 0.05, 12]} />
-            <meshStandardMaterial color={b.color} {...glass} />
-          </mesh>
-          {/* 瓶颈 —— 有没有这一截，是"酒瓶"和"色块"的分界线 */}
-          <mesh position={[0, b.h + 0.09, 0]} castShadow>
-            <cylinderGeometry args={[b.r * 0.34, b.r * 0.34, 0.08, 10]} />
-            <meshStandardMaterial color={b.color} {...glass} />
-          </mesh>
-          <mesh position={[0, b.h + 0.14, 0]}>
-            <cylinderGeometry args={[b.r * 0.38, b.r * 0.38, 0.025, 10]} />
-            <meshStandardMaterial color="#c9a227" roughness={0.35} metalness={0.7} />
-          </mesh>
-          {!b.slim && (
-            <mesh position={[0, b.h * 0.45, 0]}>
-              <cylinderGeometry args={[b.r * 1.02, b.r * 1.02, b.h * 0.3, 12]} />
-              <meshStandardMaterial color="#e8dcc8" roughness={0.85} />
-            </mesh>
+          {/* 只有中间那层挂真光源，上下两层靠自发光灯带 + Bloom 就够了 */}
+          {i === 1 && (
+            <pointLight
+              userData={{ budget: 'point' }}
+              position={[0, y + 0.12, BAR.backZ + 0.12]}
+              intensity={1.4}
+              color="#5ad6c0"
+              distance={2.6}
+              decay={2}
+            />
           )}
         </group>
       ))}
+
+      <group ref={group}>
+        {bottles.map((b, i) => (
+          <mesh key={i} position={[b.x, b.y, BAR.backZ]} castShadow>
+            <latheGeometry args={[b.profile, 10]} />
+            <meshStandardMaterial
+              color={b.color}
+              roughness={0.28}
+              metalness={0.1}
+              transparent
+              opacity={0.88}
+            />
+          </mesh>
+        ))}
+      </group>
     </group>
   )
+}
+
+const tmpVec = new THREE.Vector3()
+
+/**
+ * 一整只酒瓶的车削截面：瓶身 → 收肩 → 瓶颈 → 瓶盖，一次成型。
+ *
+ * 之前每只瓶子是五个 mesh 叠出来的，111 只就是 555 个 mesh，
+ * 占了全场的三分之一，实测隐藏它们能从 55 FPS 涨到 76。
+ * 车削不但把它压成一个 mesh，收肩还是平滑的曲面，比堆圆柱更像瓶子。
+ */
+function bottleProfile(r: number, h: number): THREE.Vector2[] {
+  return [
+    new THREE.Vector2(0, 0),
+    new THREE.Vector2(r, 0),
+    new THREE.Vector2(r, h * 0.9),
+    new THREE.Vector2(r * 0.72, h + 0.03),
+    new THREE.Vector2(r * 0.4, h + 0.07),
+    new THREE.Vector2(r * 0.34, h + 0.11),
+    new THREE.Vector2(r * 0.34, h + 0.2),
+    new THREE.Vector2(r * 0.4, h + 0.21),
+    new THREE.Vector2(r * 0.4, h + 0.235),
+    new THREE.Vector2(0, h + 0.235),
+  ]
 }
 
 /** 吧凳：圆座 + 立柱 + 底盘 + 脚环 */
@@ -618,7 +639,6 @@ function Fireplace() {
             <sphereGeometry args={[0.03, 8, 6]} />
             <meshBasicMaterial color="#ffd08a" toneMapped={false} />
           </mesh>
-          <pointLight position={[0, 0.16, 0]} intensity={1.6} color="#ffb257" distance={3} decay={2} />
         </group>
       ))}
 
@@ -628,9 +648,9 @@ function Fireplace() {
         <meshStandardMaterial color="#241b16" roughness={0.95} />
       </mesh>
 
-      <pointLight ref={light} position={[0, 0.55, 0.2]} color="#ff8a3d" distance={12} decay={2} />
+      <pointLight ref={light} userData={{ budget: 'point' }} position={[0, 0.55, 0.2]} color="#ff8a3d" distance={12} decay={2} />
       {/* 溢到炉外地面上的那摊光 */}
-      <pointLight position={[0, 0.3, 1.5]} intensity={3} color="#ff7a2e" distance={6} decay={2} />
+      <pointLight userData={{ budget: 'point' }} position={[0, 0.3, 1.5]} intensity={3} color="#ff7a2e" distance={6} decay={2} />
     </group>
   )
 }
@@ -663,6 +683,7 @@ function Sconces() {
                 <meshBasicMaterial color="#ffcf8a" toneMapped={false} />
               </mesh>
               <pointLight
+                userData={{ budget: 'point' }}
                 position={[side * -0.35, 0.06, 0]}
                 intensity={2.6}
                 color="#ffb257"
@@ -693,14 +714,13 @@ function Neon() {
         <boxGeometry args={[4.6, 0.055, 0.03]} />
         <meshBasicMaterial color="#ff3d7f" toneMapped={false} />
       </mesh>
-      <pointLight position={[3.4, 2.6, d / 2 - 0.6]} intensity={7} color="#ff3d7f" distance={8} decay={2} />
+      <pointLight userData={{ budget: 'point' }} position={[3.4, 2.6, d / 2 - 0.6]} intensity={7} color="#ff3d7f" distance={8} decay={2} />
 
       {/* 东墙靠南，青色竖条，走进来第一眼就能看到 */}
       <mesh position={[w / 2 - 0.06, 2.2, 9.5]} rotation={[0, -Math.PI / 2, 0]}>
         <boxGeometry args={[3.2, 0.05, 0.03]} />
         <meshBasicMaterial color="#2ee0c0" toneMapped={false} />
       </mesh>
-      <pointLight position={[w / 2 - 0.7, 2.2, 9.5]} intensity={6} color="#2ee0c0" distance={7} decay={2} />
 
       {/* 二层挑台内侧的一圈暗红灯带，从楼下抬头能看到，勾出上层轮廓 */}
       {[-5.0, 5.0].map((x, i) => (
@@ -709,23 +729,12 @@ function Neon() {
           <meshBasicMaterial color="#ff5a2e" toneMapped={false} />
         </mesh>
       ))}
-      {[-5.0, 5.0].map((x, i) => (
-        <pointLight
-          key={i}
-          position={[x, FLOOR2_Y - 0.5, -3.3]}
-          intensity={3.5}
-          color="#ff5a2e"
-          distance={7}
-          decay={2}
-        />
-      ))}
 
       {/* 吧台上方的环形招牌 */}
       <mesh position={[-9.6, 2.95, 0.5]} rotation={[0, Math.PI / 2, 0]}>
         <torusGeometry args={[0.46, 0.026, 12, 40]} />
         <meshBasicMaterial color="#ffb257" toneMapped={false} />
       </mesh>
-      <pointLight position={[-8.9, 2.95, 0.5]} intensity={5} color="#ffb257" distance={6} decay={2} />
     </group>
   )
 }

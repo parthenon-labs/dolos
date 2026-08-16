@@ -9,7 +9,8 @@ import { useControls } from 'leva'
  */
 export function Lighting() {
   const c = useControls('大厅光照', {
-    ambient: { value: 0.1, min: 0, max: 1, step: 0.01, label: '环境光' },
+    // 删掉八盏桌下反弹光之后，靠环境光把下半身的死黑补回来 —— 一盏抵八盏
+    ambient: { value: 0.16, min: 0, max: 1, step: 0.01, label: '环境光' },
     ambientColor: { value: '#4a6a8c', label: '环境光色' },
     // 空间拉长后雾要减淡，否则大厅深处直接糊成一片黑，纵深感反而没了。
     // 雾的作用是分层，不是遮挡。
