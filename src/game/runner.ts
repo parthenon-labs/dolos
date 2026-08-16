@@ -22,8 +22,14 @@ export type GameResult = {
   reason: string
   events: GameEvent[]
   roles: GameState['roles']
-  /** agent 给出非法动作的次数。LLM 高、规则 bot 应该恒为 0 */
+  /** 动作不合法（人数不对、编号越界…）。这是能力指标 */
   illegalActions: number
+  /**
+   * 调用直接抛错的次数（网络、鉴权、解析）。
+   * **和非法动作分开统计** —— 混在一起的话，一个坏掉的 API key 会伪装成
+   * "模型很笨"，而这两种问题的排查方向完全相反。
+   */
+  callErrors: number
 }
 
 /** agent 给非法动作时重试几次，超了就用兜底动作 */
@@ -46,6 +52,7 @@ export async function runGame(
   let { state, events } = startGame(config)
   const agents = makeAgents(state.roles)
   let illegal = 0
+  let errors = 0
 
   const emit = (e: GameEvent) => {
     events.push(e)
@@ -61,9 +68,9 @@ export async function runGame(
       try {
         const v = await fn()
         if (validate(v) === null) return v
-        illegal++
+        illegal++ // 答案不合法 —— 模型能力问题
       } catch {
-        illegal++
+        errors++ // 调用本身炸了 —— 配置/网络问题，不是能力问题
       }
     }
     return fallback
@@ -206,6 +213,7 @@ export async function runGame(
     events,
     roles: state.roles,
     illegalActions: illegal,
+    callErrors: errors,
   }
 }
 

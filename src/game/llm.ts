@@ -1,4 +1,8 @@
+import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
+import { requireEnv } from './env'
 
 /**
  * 模型调用的最小接口。
@@ -32,6 +36,25 @@ export type LlmConfig = {
  * 剩下的非法动作（比如队伍人数不对）才是真正的能力问题。
  */
 export function anthropicCompleter(cfg: LlmConfig = {}): Completer {
+  /*
+    构造时就把凭据查掉。
+
+    SDK 自己不校验 —— 缺 key 要到发请求才失败，而 runner 会把请求失败
+    当成"agent 给了非法动作"吞掉并走兜底。实测后果是：一整局由兜底动作
+    构成的假游戏，还输出了一份看起来正常的胜率统计。
+    这种静默降级最浪费时间，所以宁可在第一行就炸。
+
+    注意 ANTHROPIC_API_KEY 没设不等于没凭据：SDK 也认 ANTHROPIC_AUTH_TOKEN
+    和 `ant auth login` 落在 ~/.config/anthropic 的 profile。
+  */
+  const hasProfile = existsSync(join(homedir(), '.config', 'anthropic'))
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN && !hasProfile) {
+    throw new Error(
+      '没有找到 Anthropic 凭据。\n' +
+        '  在 .env 里填 ANTHROPIC_API_KEY（https://console.anthropic.com/settings/keys），\n' +
+        '  或者 `ant auth login` 登录一个 profile。',
+    )
+  }
   const client = new Anthropic()
   const model = cfg.model ?? 'claude-opus-5'
   const effort = cfg.effort ?? 'medium'
@@ -59,6 +82,79 @@ export function anthropicCompleter(cfg: LlmConfig = {}): Completer {
       throw new Error(`响应里没有文本块（stop_reason=${res.stop_reason}）`)
     }
     return JSON.parse(text.text) as Record<string, unknown>
+  }
+}
+
+/**
+ * DeepSeek completer（OpenAI 兼容接口）。
+ *
+ * **和 Anthropic 的关键差别：DeepSeek 只有 `json_object`，没有 schema 强约束。**
+ * Anthropic 的 `output_config.format` 由 API 保证返回值符合 schema；
+ * DeepSeek 只保证"是一个合法 JSON"，字段对不对得自己验。
+ * 所以这里把 schema 塞进提示词，并在拿到结果后做一次形状检查 ——
+ * 失败会被上层 runner 当作非法动作重试，这条路径已经验过。
+ *
+ * 另外它要求提示词里出现 "json" 这个词才会开启 JSON 模式，见下方拼接。
+ */
+export function deepseekCompleter(cfg: LlmConfig = {}): Completer {
+  const key = requireEnv('DEEPSEEK_API_KEY', '在 https://platform.deepseek.com/api_keys 申请')
+  const base = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
+  const model = cfg.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-chat'
+  const maxTokens = cfg.maxTokens ?? 4096
+
+  return async ({ system, user, schema, maxTokens: override }) => {
+    const res = await fetch(`${base}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: override ?? maxTokens,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: system },
+          {
+            role: 'user',
+            content:
+              `${user}\n\n` +
+              `只返回一个 json 对象，不要任何解释或代码块围栏。必须符合这个 schema：\n` +
+              JSON.stringify(schema),
+          },
+        ],
+      }),
+    })
+
+    if (!res.ok) {
+      throw new Error(`DeepSeek ${res.status}：${(await res.text()).slice(0, 200)}`)
+    }
+    const body = (await res.json()) as {
+      choices?: { message?: { content?: string } }[]
+    }
+    const text = body.choices?.[0]?.message?.content
+    if (!text) throw new Error('DeepSeek 返回里没有内容')
+
+    // 偶尔仍会裹上 ```json 围栏，剥掉再解析
+    const cleaned = text.trim().replace(/^```(?:json)?\s*|\s*```$/g, '')
+    return JSON.parse(cleaned) as Record<string, unknown>
+  }
+}
+
+/**
+ * 按环境变量选一个 completer。
+ * 有 --fake 时上层直接用 fakeCompleter，不会走到这里。
+ */
+export function makeCompleter(): Completer {
+  const provider = (process.env.LLM_PROVIDER ?? 'anthropic').toLowerCase()
+  const effort = (process.env.LLM_EFFORT as LlmConfig['effort']) ?? 'medium'
+  switch (provider) {
+    case 'deepseek':
+      return deepseekCompleter({})
+    case 'anthropic':
+      return anthropicCompleter({ effort, model: process.env.ANTHROPIC_MODEL })
+    default:
+      throw new Error(`LLM_PROVIDER 只支持 anthropic | deepseek，收到「${provider}」`)
   }
 }
 

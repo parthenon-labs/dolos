@@ -1,5 +1,8 @@
 # Dolos
 
+> **动手前先读 [`NOTES.md`](./NOTES.md)** —— 架构决策的理由、已经踩过的坑、接下来的路线图。
+> 很多看起来可以随手改的地方，背后有测过的原因。
+
 > Δόλος —— 诡计与欺瞒之灵，普罗米修斯的学徒，造过一尊以假乱真的雕像。
 
 撒谎酒馆风格的第一人称语音牌桌。目标是一个带大厅和房间、可以加 AI 补位的
@@ -304,11 +307,22 @@ npm run game -- --trace --seed 3          # 跑一局，打印完整过程
 ### 接 LLM
 
 ```bash
+cp .env.example .env                    # 填 key，.env 已被 gitignore
 npm run game -- --fake --trace          # 假 LLM，不联网，验证整条管线
-export ANTHROPIC_API_KEY=sk-ant-...
-npm run game -- --llm --trace           # 真 Anthropic（claude-opus-5）
+npm run game -- --llm --trace           # 真模型，跑一局看全过程
 npm run game -- --llm --games 50        # 批量，出胜率和刺客命中率
 ```
+
+`.env` 里 `LLM_PROVIDER` 选 `anthropic`（默认，claude-opus-5）或 `deepseek`
+（`deepseek-chat` / `deepseek-reasoner`）。规则 bot 和 `--fake` 都不联网，不需要任何配置。
+
+**两家的 JSON 保证不一样**：Anthropic 的 `output_config.format` 由 API 保证返回值符合
+schema；DeepSeek 只有 `json_object`，只保证"是合法 JSON"，字段对不对得自己验。
+所以 DeepSeek 那条路把 schema 塞进提示词并在收到后检查形状，形状不对会被当作非法动作重试。
+
+**非法动作和调用报错是分开统计的。** 混在一起的话，一个坏掉的 key 会伪装成"模型很笨"，
+而这两种问题的排查方向完全相反。缺凭据时 `--llm` 会在第一行就退出，
+不会跑出一局全是兜底动作的假游戏。
 
 **没有 key 也能验管线。** `--fake` 是一个确定性的假 LLM，它读 schema 猜字段、
 按种子给合法但随意的答案 —— 它不"会玩"，也不需要会玩。
