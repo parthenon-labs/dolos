@@ -148,10 +148,18 @@ function Lamp({ castShadows }: { castShadows: boolean }) {
         shadow-normalBias={0.02}
       />
       {/*
-        原来这里还有一盏"桌下反弹光"补下半身的死黑。八张桌子就是八盏，
-        性价比太差 —— 删掉之后靠环境光补回来，画面差别几乎看不出。
-        每加一件家具就顺手挂一盏灯，是这个场景掉到 9 FPS 的直接原因。
+        桌下反弹光，补下半身的死黑。八张桌子就是八盏，一度因为性能全删了，
+        后来发现是删错了对象 —— 挂上预算标记之后，远处那些自动熄灭，
+        真正花钱的只有你面前这一两张桌子。
       */}
+      <pointLight
+        userData={{ budget: 'point' }}
+        position={[0, 0.25, 0]}
+        intensity={1.1}
+        color="#8a5a2e"
+        distance={3.4}
+        decay={2}
+      />
     </group>
   )
 }

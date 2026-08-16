@@ -380,17 +380,14 @@ function BackBar({ width }: { width: number }) {
             <boxGeometry args={[width - 0.5, 0.012, 0.015]} />
             <meshBasicMaterial color={i === 1 ? '#5ad6c0' : '#ffb257'} toneMapped={false} />
           </mesh>
-          {/* 只有中间那层挂真光源，上下两层靠自发光灯带 + Bloom 就够了 */}
-          {i === 1 && (
-            <pointLight
-              userData={{ budget: 'point' }}
-              position={[0, y + 0.12, BAR.backZ + 0.12]}
-              intensity={1.4}
-              color="#5ad6c0"
-              distance={2.6}
-              decay={2}
-            />
-          )}
+          <pointLight
+            userData={{ budget: 'point' }}
+            position={[0, y + 0.12, BAR.backZ + 0.12]}
+            intensity={i === 1 ? 1.4 : 1.0}
+            color={i === 1 ? '#5ad6c0' : '#ffb257'}
+            distance={2.4}
+            decay={2}
+          />
         </group>
       ))}
 
@@ -639,6 +636,7 @@ function Fireplace() {
             <sphereGeometry args={[0.03, 8, 6]} />
             <meshBasicMaterial color="#ffd08a" toneMapped={false} />
           </mesh>
+          <pointLight userData={{ budget: 'point' }} position={[0, 0.16, 0]} intensity={1.6} color="#ffb257" distance={3} decay={2} />
         </group>
       ))}
 
@@ -721,6 +719,7 @@ function Neon() {
         <boxGeometry args={[3.2, 0.05, 0.03]} />
         <meshBasicMaterial color="#2ee0c0" toneMapped={false} />
       </mesh>
+      <pointLight userData={{ budget: 'point' }} position={[w / 2 - 0.7, 2.2, 9.5]} intensity={6} color="#2ee0c0" distance={7} decay={2} />
 
       {/* 二层挑台内侧的一圈暗红灯带，从楼下抬头能看到，勾出上层轮廓 */}
       {[-5.0, 5.0].map((x, i) => (
@@ -729,12 +728,27 @@ function Neon() {
           <meshBasicMaterial color="#ff5a2e" toneMapped={false} />
         </mesh>
       ))}
+      {/* 长灯带用三盏分段代表，只有一盏时中间亮两头黑，条就断了 */}
+      {[-5.0, 5.0].flatMap((x) =>
+        [-9.5, -3.3, 2.9].map((z) => (
+          <pointLight
+            key={`${x}:${z}`}
+            userData={{ budget: 'point' }}
+            position={[x, FLOOR2_Y - 0.5, z]}
+            intensity={3.2}
+            color="#ff5a2e"
+            distance={6.5}
+            decay={2}
+          />
+        )),
+      )}
 
       {/* 吧台上方的环形招牌 */}
       <mesh position={[-9.6, 2.95, 0.5]} rotation={[0, Math.PI / 2, 0]}>
         <torusGeometry args={[0.46, 0.026, 12, 40]} />
         <meshBasicMaterial color="#ffb257" toneMapped={false} />
       </mesh>
+      <pointLight userData={{ budget: 'point' }} position={[-8.9, 2.95, 0.5]} intensity={5} color="#ffb257" distance={6} decay={2} />
     </group>
   )
 }
