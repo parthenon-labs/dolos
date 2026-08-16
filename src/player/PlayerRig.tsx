@@ -18,7 +18,6 @@ import {
 } from '../scene/hallLayout'
 import { usePlayerStore } from '../state/usePlayerStore'
 
-// 移动 / 转向速度都挪到 leva 里可调了，这里只留加速度
 const ACCEL = 14
 const SIT_DURATION = 1.15
 const STAND_DURATION = 0.85
@@ -36,16 +35,10 @@ const FOV_SEATED = 60
 const SEATED_YAW_LIMIT = THREE.MathUtils.degToRad(78)
 const SEATED_PITCH_UP = THREE.MathUtils.degToRad(20)
 const SEATED_PITCH_DOWN = THREE.MathUtils.degToRad(34)
-const WALK_PITCH = THREE.MathUtils.degToRad(72)
+const WALK_PITCH = THREE.MathUtils.degToRad(78)
 
-const LOOK_SPEED = 0.0026
-
-/** 自动转向的跟随速度。太快像被拽着走，太慢转弯会甩出去 */
-const TURN_RATE = 4.5
-/** 速度低于这个值就不再更新朝向，否则停步瞬间方向向量抖动会让镜头乱甩 */
-const FACE_THRESHOLD = 0.4
-/** 点击寻路的到达判定半径 */
-const ARRIVE_RADIUS = 0.45
+/** 落座后拖拽环视的速度（这时指针是解锁的） */
+const DRAG_SPEED = 0.0026
 
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
@@ -57,9 +50,13 @@ const easeInOutCubic = (t: number) =>
  * 多个组件同时写 camera.position/rotation 会互相打架，而且 bug 极难查。
  * 谁拥有相机，必须是明确的一个地方。
  *
- * 输入方案：**不锁指针**，按住拖拽转视角，光标始终可见。
- * 代价是转视角要按住鼠标，不如 FPS 顺手；换来的是光标能去 hover 椅子、
- * 点牌、点按钮 —— 对一个牌桌游戏这笔交易是划算的。
+ * 输入方案对齐撒谎酒馆：**走动时锁指针，鼠标直接转视角不用按住**，
+ * WASD 相对镜头移动，Shift 跑。
+ * 坐下的瞬间解锁指针，因为牌桌上要用光标点牌、点按钮。
+ *
+ * 中间试过"按住拖拽转视角"，为的是留住光标去 hover 选座 —— 那是本末倒置：
+ * 手感的上限被一个自找的限制卡死了，后面怎么调参数都追不回来。
+ * 选座改成走近自动选中，就不再需要光标了。
  */
 export function PlayerRig() {
   const { camera, gl } = useThree()
@@ -68,38 +65,16 @@ export function PlayerRig() {
   const seatedAt = usePlayerStore((s) => s.seatedAt)
   const finishSit = usePlayerStore((s) => s.finishSit)
   const finishStand = usePlayerStore((s) => s.finishStand)
-  const moveTarget = usePlayerStore((s) => s.moveTarget)
-  const setMoveTarget = usePlayerStore((s) => s.setMoveTarget)
+  const setLocked = usePlayerStore((s) => s.setLocked)
 
-  /**
-   * 手感参数全部开放成滑块。
-   * "难受"是很难靠猜去修的 —— 与其我一轮轮改默认值，不如让人当场拖到舒服为止。
-   */
   const ctrl = useControls('手感', {
-    steering: {
-      value: 'strafe',
-      options: {
-        'WASD 平移 · ←→ 转向': 'strafe',
-        'A/D 转向 · Q/E 侧移': 'turn',
-      },
-      label: '操作方式',
-    },
-    walkSpeed: { value: 2.8, min: 1.2, max: 5, step: 0.1, label: '移动速度' },
-    turnSpeed: { value: 3.2, min: 1, max: 7, step: 0.1, label: '转向速度' },
+    walkSpeed: { value: 2.9, min: 1.2, max: 5, step: 0.1, label: '走路速度' },
+    runMultiplier: { value: 1.7, min: 1, max: 2.6, step: 0.05, label: '奔跑倍率' },
+    sensitivity: { value: 2.2, min: 0.5, max: 6, step: 0.1, label: '鼠标灵敏度' },
     bob: { value: 0.6, min: 0, max: 2, step: 0.05, label: '头部晃动' },
   })
-  const steering = useRef(ctrl.steering)
-  steering.current = ctrl.steering
-  const turnSpeed = useRef(ctrl.turnSpeed)
-  turnSpeed.current = ctrl.turnSpeed
-  const walkSpeed = useRef(ctrl.walkSpeed)
-  walkSpeed.current = ctrl.walkSpeed
-  const bobAmount = useRef(ctrl.bob)
-  bobAmount.current = ctrl.bob
-
-  const moveTargetRef = useRef(moveTarget)
-  moveTargetRef.current = moveTarget
-  const stuckFrames = useRef(0)
+  const cfg = useRef(ctrl)
+  cfg.current = ctrl
 
   // 位置只维护水平分量，脚下标高单独算
   // 出生在南端入口，yaw=0 面朝 -Z，也就是望穿整条大厅。
@@ -161,54 +136,61 @@ export function PlayerRig() {
     }
   }, [])
 
-  /* ---------------- 拖拽转视角 ---------------- */
+  /* ---------------- 走动：锁指针 + 自由鼠标视角 ---------------- */
 
   useEffect(() => {
     const el = gl.domElement
 
+    const onLockChange = () => setLocked(document.pointerLockElement === el)
+    const onMouseMove = (e: MouseEvent) => {
+      if (document.pointerLockElement !== el) return
+      if (modeRef.current !== 'walking') return
+      const s = cfg.current.sensitivity * 0.001
+      targetYaw.current -= e.movementX * s
+      targetPitch.current = THREE.MathUtils.clamp(
+        targetPitch.current - e.movementY * s,
+        -WALK_PITCH,
+        WALK_PITCH,
+      )
+    }
+
+    document.addEventListener('pointerlockchange', onLockChange)
+    document.addEventListener('mousemove', onMouseMove)
+    return () => {
+      document.removeEventListener('pointerlockchange', onLockChange)
+      document.removeEventListener('mousemove', onMouseMove)
+    }
+  }, [gl, setLocked])
+
+  /* ---------------- 落座：解锁指针，按住拖拽环视 ---------------- */
+
+  useEffect(() => {
+    const el = gl.domElement
     const onDown = (e: PointerEvent) => {
-      if (modeRef.current !== 'walking' && modeRef.current !== 'seated') return
+      if (modeRef.current !== 'seated') return
       dragging.current = true
       lastPointer.current = { x: e.clientX, y: e.clientY }
     }
-
-    // move/up 挂在 window 而不是 canvas，也不用 setPointerCapture ——
-    // 捕获会干扰 R3F 自己的事件系统，而 hover 选座正依赖它。
     const onMove = (e: PointerEvent) => {
-      if (!dragging.current) return
-      const m = modeRef.current
-      if (m !== 'walking' && m !== 'seated') return
-
+      if (!dragging.current || modeRef.current !== 'seated') return
       const dx = e.clientX - lastPointer.current.x
       const dy = e.clientY - lastPointer.current.y
       lastPointer.current = { x: e.clientX, y: e.clientY }
-
-      if (m === 'seated') {
-        const base = seatedBaseYaw.current
-        targetYaw.current = THREE.MathUtils.clamp(
-          targetYaw.current - dx * LOOK_SPEED,
-          base - SEATED_YAW_LIMIT,
-          base + SEATED_YAW_LIMIT,
-        )
-        targetPitch.current = THREE.MathUtils.clamp(
-          targetPitch.current - dy * LOOK_SPEED,
-          -SEATED_PITCH_DOWN,
-          SEATED_PITCH_UP,
-        )
-      } else {
-        targetYaw.current -= dx * LOOK_SPEED
-        targetPitch.current = THREE.MathUtils.clamp(
-          targetPitch.current - dy * LOOK_SPEED,
-          -WALK_PITCH,
-          WALK_PITCH,
-        )
-      }
+      const base = seatedBaseYaw.current
+      targetYaw.current = THREE.MathUtils.clamp(
+        targetYaw.current - dx * DRAG_SPEED,
+        base - SEATED_YAW_LIMIT,
+        base + SEATED_YAW_LIMIT,
+      )
+      targetPitch.current = THREE.MathUtils.clamp(
+        targetPitch.current - dy * DRAG_SPEED,
+        -SEATED_PITCH_DOWN,
+        SEATED_PITCH_UP,
+      )
     }
-
     const onUp = () => {
       dragging.current = false
     }
-
     el.addEventListener('pointerdown', onDown)
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
@@ -229,6 +211,8 @@ export function PlayerRig() {
       if (!table) return
       const target = seatedCamera(table, seatedAt.seat)
       seatedBaseYaw.current = nearestAngle(yaw.current, target.yaw)
+      // 坐下立刻把指针还给用户 —— 牌桌上要点牌点按钮
+      if (document.pointerLockElement) document.exitPointerLock()
       tween.current = {
         t: 0,
         dur: SIT_DURATION,
@@ -325,38 +309,20 @@ export function PlayerRig() {
 
   function stepWalking(dt: number) {
     const k = keys.current
-    const turnMode = steering.current === 'turn'
-    const SPEED = walkSpeed.current
+    const running = k['ShiftLeft'] || k['ShiftRight']
+    const SPEED = cfg.current.walkSpeed * (running ? cfg.current.runMultiplier : 1)
 
-    // 一次算清这一帧的前后 / 转向 / 侧移三种意图。
-    //
-    // 默认（strafe）：WASD 还是最熟悉的那套 —— W/S 前后、A/D 侧移，
-    // 转向交给方向键 ←→，所以键盘依然能独立控制方向，不用碰鼠标。
-    // 这样在满是桌子的厅里挪位置不用"转身-走-再转回来"。
-    // 可选（turn）：老式坦克操作，A/D 转向、Q/E 侧移。
+    // 标准 FPS：W/S 前后、A/D 侧移，都相对镜头。方向键同义。
     const fwd =
       (k['KeyW'] || k['ArrowUp'] ? 1 : 0) - (k['KeyS'] || k['ArrowDown'] ? 1 : 0)
-    const turn = turnMode
-      ? (k['KeyA'] || k['ArrowLeft'] ? 1 : 0) - (k['KeyD'] || k['ArrowRight'] ? 1 : 0)
-      : (k['ArrowLeft'] ? 1 : 0) - (k['ArrowRight'] ? 1 : 0)
-    const strafe = turnMode
-      ? (k['KeyE'] ? 1 : 0) - (k['KeyQ'] ? 1 : 0)
-      : (k['KeyD'] ? 1 : 0) - (k['KeyA'] ? 1 : 0)
+    const strafe =
+      (k['KeyD'] || k['ArrowRight'] ? 1 : 0) - (k['KeyA'] || k['ArrowLeft'] ? 1 : 0)
 
-    const hasKeys = fwd !== 0 || turn !== 0 || strafe !== 0
-    // 有键盘输入就取消点击寻路 —— 手动永远优先
-    if (hasKeys && moveTargetRef.current) setMoveTarget(null)
-
-    // A/D 直接改朝向。**这是"准"的来源**：W 永远精确等于当前朝向，
-    // 按下去走的方向和屏幕上的"前"是同一个，中间没有过渡期。
-    //
-    // 之前那版把 WASD 做成世界方向、再让镜头去追移动方向，问题就出在过渡期上：
-    // 朝北站着按 D，人立刻往东走，镜头却要半秒才转过来，那半秒里
-    // 按键方向和屏幕方向对不上 —— 而且第一人称里根本没有"北"的视觉锚点。
-    if (turn !== 0) targetYaw.current += turn * turnSpeed.current * dt
+    // 鼠标已经直接写 targetYaw 了，这里只做一点点平滑
+    yaw.current = THREE.MathUtils.damp(yaw.current, targetYaw.current, 30, dt)
+    pitch.current = THREE.MathUtils.damp(pitch.current, targetPitch.current, 30, dt)
 
     tmp.set(0, 0)
-
     if (fwd !== 0 || strafe !== 0) {
       // 前方 = (-sin y, -cos y)，右方 = (cos y, -sin y)
       const c = Math.cos(yaw.current)
@@ -365,51 +331,12 @@ export function PlayerRig() {
       const vz = -c * fwd - s * strafe
       const len = Math.hypot(vx, vz)
       tmp.set((vx / len) * SPEED, (vz / len) * SPEED)
-    } else if (moveTargetRef.current) {
-      // 朝点击的目的地直走。没有寻路，撞到东西会沿着障碍滑 ——
-      // 一个开阔的厅里够用了，真要绕柱子再说。
-      const [tx, tz] = moveTargetRef.current
-      const dx = tx - pos.current.x
-      const dz = tz - pos.current.y
-      const dist = Math.hypot(dx, dz)
-      if (dist < ARRIVE_RADIUS) {
-        setMoveTarget(null)
-        stuckFrames.current = 0
-      } else {
-        // 快到了就减速，否则会冲过头再倒回来，很难看
-        const speed = SPEED * Math.min(1, dist / 1.2)
-        tmp.set((dx / dist) * speed, (dz / dist) * speed)
-      }
     }
-
-    // 自动转向**只在点击寻路时生效**。
-    // 用键盘走的时候玩家自己在用 A/D 掌舵，镜头再去抢方向就会打架。
-    // 阈值是为了在停下时保持朝向 —— 速度掉到 0 时方向向量会抖，
-    // 不设阈值镜头会在停步瞬间乱甩。
-    const following = !!moveTargetRef.current && !hasKeys && !dragging.current
-    if (following) {
-      const v = vel.current
-      if (v.lengthSq() > FACE_THRESHOLD * FACE_THRESHOLD) {
-        // forward = (-sin y, -cos y)，反解出 y
-        const want = Math.atan2(-v.x, -v.y)
-        targetYaw.current = nearestAngle(targetYaw.current, want)
-      }
-    }
-
-    yaw.current = THREE.MathUtils.damp(
-      yaw.current,
-      targetYaw.current,
-      following ? TURN_RATE : 22,
-      dt,
-    )
-    pitch.current = THREE.MathUtils.damp(pitch.current, targetPitch.current, 22, dt)
 
     // 加速度而不是直接赋值 —— 瞬间启停的移动手感很廉价
     vel.current.x = THREE.MathUtils.damp(vel.current.x, tmp.x, ACCEL, dt)
     vel.current.y = THREE.MathUtils.damp(vel.current.y, tmp.y, ACCEL, dt)
 
-    const prevX = pos.current.x
-    const prevZ = pos.current.y
     const dx = vel.current.x * dt
     const dz = vel.current.y * dt
 
@@ -421,22 +348,6 @@ export function PlayerRig() {
       if (okX) vel.current.y = 0
       else if (okZ) vel.current.x = 0
       else vel.current.set(0, 0)
-    }
-
-    /*
-      卡住检测必须看**实际位移**，不能看速度。
-      顶着桌子推的时候速度一直是满的，只是每帧都被碰撞推回原处 ——
-      按速度判断的话永远判不出卡住，玩家会一直贴着桌子抖。
-    */
-    if (moveTargetRef.current && !hasKeys) {
-      const moved = Math.hypot(pos.current.x - prevX, pos.current.y - prevZ)
-      if (moved < 0.004) {
-        stuckFrames.current++
-        if (stuckFrames.current > 40) {
-          setMoveTarget(null)
-          stuckFrames.current = 0
-        }
-      } else stuckFrames.current = 0
     }
 
     // 上下楼梯时把标高做平滑，否则每级台阶都会顿一下
@@ -453,7 +364,7 @@ export function PlayerRig() {
     const speed = vel.current.length()
     bobPhase.current += dt * speed * 3.4
     const ratio = Math.min(1, speed / Math.max(0.1, SPEED))
-    const amp = bobAmount.current * ratio
+    const amp = cfg.current.bob * ratio
     const bob = Math.sin(bobPhase.current) * 0.022 * amp
     const roll = Math.sin(bobPhase.current) * 0.004 * amp
 

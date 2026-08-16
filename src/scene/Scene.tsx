@@ -9,7 +9,6 @@ import { SeatPicker } from '../player/SeatPicker'
 import { TABLES } from './hallLayout'
 import { Hall } from './hall/Hall'
 import { TableUnit } from './hall/TableUnit'
-import { MoveMarker } from './hall/MoveMarker'
 import { Effects } from './Effects'
 import { Lighting } from './Lighting'
 import { LightBudget } from './LightBudget'
@@ -29,7 +28,6 @@ export function Scene() {
       <Hall />
       <ShadowBudget />
       <LightBudget />
-      <MoveMarker />
       <SpeakerTracker />
       <Effects />
       {import.meta.env.DEV && <DevHandle />}

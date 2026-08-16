@@ -14,20 +14,14 @@ type PlayerState = {
   seatedAt: SeatRef | null
   /** 光标当前指着的空位 */
   hovered: SeatRef | null
-  /**
-   * 是否已经过了进场页。
-   * 保留它不是为了指针锁定（已经不锁了），而是因为浏览器的自动播放策略
-   * 要求 AudioContext 必须在一次用户手势之后才能 resume —— 接真语音时
-   * 这一次点击就是那个手势。
-   */
+  /** 是否已经过了进场页（也是 AudioContext 需要的那次用户手势） */
   entered: boolean
-
-  /** 点地板设的目的地（世界平面坐标），到达或被 WASD 打断就清空 */
-  moveTarget: [number, number] | null
+  /** 指针当前是否锁定。走动时锁，落座时解锁 */
+  locked: boolean
 
   setHovered: (s: SeatRef | null) => void
   setEntered: (v: boolean) => void
-  setMoveTarget: (t: [number, number] | null) => void
+  setLocked: (v: boolean) => void
   beginSit: (s: SeatRef) => void
   finishSit: () => void
   beginStand: () => void
@@ -39,7 +33,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   seatedAt: null,
   hovered: null,
   entered: false,
-  moveTarget: null,
+  locked: false,
 
   setHovered: (s) =>
     set((prev) => {
@@ -50,12 +44,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }),
 
   setEntered: (v) => set((p) => (p.entered === v ? p : { entered: v })),
-
-  setMoveTarget: (t) => set({ moveTarget: t }),
+  setLocked: (v) => set((p) => (p.locked === v ? p : { locked: v })),
 
   beginSit: (s) => {
     if (get().mode !== 'walking') return
-    set({ mode: 'sitting-down', seatedAt: s, hovered: null, moveTarget: null })
+    set({ mode: 'sitting-down', seatedAt: s, hovered: null })
   },
   finishSit: () => set({ mode: 'seated' }),
 

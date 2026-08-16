@@ -6,33 +6,38 @@ import { TABLES } from '../scene/hallLayout'
  * HUD。存在的意义是证明一件事：2D UI 和 3D 场景吃的是同一个 store，
  * 以后 WebSocket 推来的游戏状态会同时驱动这两边。
  *
- * 注意这里**没有准心**了 —— 选座改成了光标 hover，提示牌直接贴在
- * 那把椅子上方（见 Seat.tsx），而不是永远悬在屏幕正中。
+ * 走动时指针是锁定的（标准 FPS），所以有一个很轻的准心；
+ * 它不用来瞄椅子 —— 选座是按距离自动选的 —— 只是给视线一个中心参考。
  */
 export function Hud() {
   const mode = usePlayerStore((s) => s.mode)
   const seatedAt = usePlayerStore((s) => s.seatedAt)
   const entered = usePlayerStore((s) => s.entered)
+  const locked = usePlayerStore((s) => s.locked)
 
   const occupancy = useGameStore((s) => s.occupancy)
   const speakingKey = useGameStore((s) => s.speakingKey)
 
   const seatedTable = seatedAt ? TABLES.find((t) => t.id === seatedAt.tableId) : null
+  const walking = mode === 'walking'
 
   return (
     <div className="hud">
       <div className="hud-top">
         <div className="hud-title">DOLOS</div>
         <div className="hud-sub">
-          {mode === 'walking'
-            ? 'WASD 移动 · ←→ 转向 · 点地面走过去 · 空位按 E 坐下 · 手感可在右上角调'
+          {walking
+            ? 'WASD 移动 · 鼠标转视角 · Shift 跑 · 走到空椅子旁按 E 坐下'
             : mode === 'seated'
               ? '按住拖拽环视 · Q 起身'
               : ''}
         </div>
       </div>
 
-      {!entered && <ClickToStart />}
+      {walking && locked && <div className="crosshair" />}
+
+      {!entered && <StartOverlay />}
+      {entered && walking && !locked && <ResumeOverlay />}
 
       {mode === 'seated' && seatedTable && (
         <div className="hud-bottom">
@@ -63,15 +68,25 @@ export function Hud() {
   )
 }
 
+function lockPointer() {
+  document.querySelector('canvas')?.requestPointerLock()
+}
+
 /**
- * 进场页。已经不再需要它去申请指针锁定了，留着是因为：
- * 浏览器要求 AudioContext 必须在用户手势之后才能启动，接真语音时
- * 这一下点击就是那个手势。顺带也是个进入酒吧的仪式感。
+ * 进场页。两个作用都必须有：
+ * PointerLock 只能由用户手势触发，浏览器不允许自动锁定；
+ * 而 AudioContext 同样要求一次手势才能 resume —— 接真语音时就是这一下。
  */
-function ClickToStart() {
+function StartOverlay() {
   const setEntered = usePlayerStore((s) => s.setEntered)
   return (
-    <div className="start-overlay" onClick={() => setEntered(true)}>
+    <div
+      className="start-overlay"
+      onClick={() => {
+        setEntered(true)
+        lockPointer()
+      }}
+    >
       <div className="start-card">
         <div className="start-title">DOLOS</div>
         <div className="start-desc">点击进入酒吧</div>
@@ -82,18 +97,25 @@ function ClickToStart() {
             <kbd>S</kbd>
             <kbd>D</kbd> 移动
           </span>
+          <span>鼠标 转视角</span>
           <span>
-            <kbd>←</kbd>
-            <kbd>→</kbd> 转向
+            <kbd>Shift</kbd> 跑
           </span>
-          <span>点地面 走过去</span>
           <span>
             <kbd>E</kbd> 坐下
           </span>
-          <span>
-            <kbd>Q</kbd> 起身
-          </span>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** 按 Esc 会被浏览器强制解锁指针，得给一个显眼的回去的路 */
+function ResumeOverlay() {
+  return (
+    <div className="start-overlay resume-overlay" onClick={lockPointer}>
+      <div className="start-card">
+        <div className="start-desc">点击继续</div>
       </div>
     </div>
   )

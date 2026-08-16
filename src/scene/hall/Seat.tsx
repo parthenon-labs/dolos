@@ -3,19 +3,14 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { usePlayerStore } from '../../state/usePlayerStore'
-import { useGameStore } from '../../state/useGameStore'
 import { seatFacing, seatLocal } from '../hallLayout'
 
-/** 超过这个距离够不着，只高亮不给坐 */
-const REACH = 3.6
-
 /**
- * 一把椅子 + 一个透明的命中体。
+ * 一把椅子。
  *
- * 命中体用 opacity=0 的材质而不是 visible={false}：three 的 Raycaster
- * 会跳过 visible=false 的对象，那样 R3F 的指针事件永远收不到。
- * 它也比椅子本身大一圈 —— 交互体积永远该比视觉体积宽容，
- * 拿光标去够细椅子腿不是什么好体验。
+ * 它本身不再处理任何输入 —— 选中哪把是 SeatPicker 按距离算出来的，
+ * 这里只负责把结果画出来：空位常态微微呼吸，被选中就亮起来并浮出提示。
+ * 之前那个用来接指针事件的透明命中体已经不需要了。
  */
 export function Seat({
   tableId,
@@ -29,16 +24,8 @@ export function Seat({
   empty: boolean
 }) {
   const glow = useRef<THREE.MeshBasicMaterial>(null)
-  const hit = useRef<THREE.Mesh>(null)
-  const inReach = useRef(false)
-  const worldPos = useRef(new THREE.Vector3())
-  const frame = useRef(0)
-
   const mode = usePlayerStore((s) => s.mode)
   const hovered = usePlayerStore((s) => s.hovered)
-  const setHovered = usePlayerStore((s) => s.setHovered)
-  const beginSit = usePlayerStore((s) => s.beginSit)
-  const claimSeat = useGameStore((s) => s.claimSeat)
 
   const isHovered =
     !!hovered && hovered.tableId === tableId && hovered.seat === index
@@ -47,32 +34,13 @@ export function Seat({
   const pos = seatLocal(index, seatCount)
   const rot = seatFacing(index, seatCount)
 
-  useFrame(({ camera }, dt) => {
-    // 距离检查降频到 6 帧一次，玩家不可能在 1/10 秒里跨越三米
-    frame.current++
-    if (hit.current && frame.current % 6 === 0) {
-      hit.current.getWorldPosition(worldPos.current)
-      const near = camera.position.distanceTo(worldPos.current) < REACH
-      if (near !== inReach.current) {
-        inReach.current = near
-        // 走出范围时要主动摘掉 hover，否则提示会一直挂在那儿
-        if (!near && isHovered) setHovered(null)
-      }
-    }
-
+  useFrame((_, dt) => {
     if (!glow.current) return
     const t = performance.now() / 1000
-    // 空位常态微微呼吸，被指到时亮起来
     const base = selectable ? 0.16 + Math.sin(t * 2.1 + index) * 0.05 : 0
     const target = isHovered ? 0.9 : base
     glow.current.opacity = THREE.MathUtils.damp(glow.current.opacity, target, 12, dt)
   })
-
-  const sit = () => {
-    if (!selectable || !inReach.current) return
-    claimSeat(tableId, index, { name: '你', color: '#c9a227', isAI: false })
-    beginSit({ tableId, seat: index })
-  }
 
   return (
     <group position={pos} rotation={[0, rot, 0]}>
@@ -126,30 +94,6 @@ export function Seat({
           </div>
         </Html>
       )}
-
-      {/* 命中体：透明但可被射线击中，且比椅子宽容 */}
-      <mesh
-        ref={hit}
-        position={[0, 0.7, 0]}
-        onPointerOver={(e) => {
-          if (!selectable) return
-          e.stopPropagation()
-          setHovered({ tableId, seat: index })
-        }}
-        onPointerOut={() => {
-          if (isHovered) setHovered(null)
-        }}
-        onClick={(e) => {
-          // 够不着或已有人时不拦截事件，让这一下点击穿过去落到地板上，
-          // 变成"走过去"的指令 —— 对着占着的椅子点一下毫无反应最劝退
-          if (!selectable || !inReach.current) return
-          e.stopPropagation()
-          sit()
-        }}
-      >
-        <boxGeometry args={[0.8, 1.5, 0.8]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
     </group>
   )
 }
