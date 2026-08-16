@@ -12,8 +12,33 @@ import { TableUnit } from './hall/TableUnit'
 import { Effects } from './Effects'
 import { Lighting } from './Lighting'
 import { LightBudget } from './LightBudget'
+import { CueDriver, useEventBridge } from '../anim/CueDriver'
+import { useDemoGame } from '../anim/useDemoGame'
+import { useTableView } from '../state/useTableStore'
+import { useCues } from '../anim/cues'
+import { preloadModels } from './character/models'
+import { gestureAtTable, registeredSeats, setActiveTable } from './character/rigRegistry'
+
+// 模型必须在进大厅**之前**下载完。坐下那一刻才开始下载的话，
+// 玩家会盯着空椅子等好几秒 —— 那正好是整个体验里期待值最高的时刻。
+// 清单为空时这是个空操作。
+preloadModels()
 
 export function Scene() {
+  // 落座后自动开一局演示对局。接 WebSocket 后换成真实事件源，
+  // useEventBridge 那边一行不用改。
+  const seated = usePlayerStore((s) => s.mode === 'seated')
+  const seatedAt = usePlayerStore((s) => s.seatedAt)
+  const demoEvents = useDemoGame(seated)
+  useEventBridge(demoEvents, 5)
+
+  // 告诉 rig 登记表手势该往哪张桌子发。
+  // cue 只知道座位号 —— 一局游戏只发生在一张桌子上，桌号是外部上下文。
+  useEffect(() => {
+    setActiveTable(seated ? (seatedAt?.tableId ?? null) : null)
+    return () => setActiveTable(null)
+  }, [seated, seatedAt])
+
   // 接真 WebRTC 时，把这一段换成：
   //   import { startWebRTCDriver } from '../audio/webrtcDriver'
   //   useEffect(() => startWebRTCDriver(), [])
@@ -28,6 +53,7 @@ export function Scene() {
       <Hall />
       <ShadowBudget />
       <LightBudget />
+      <CueDriver />
       <SpeakerTracker />
       <Effects />
       {import.meta.env.DEV && <DevHandle />}
@@ -44,6 +70,10 @@ function DevHandle() {
     d.scene = scene
     d.camera = camera
     d.gl = gl
+    d.tableView = useTableView
+    d.cues = useCues
+    d.gesture = gestureAtTable
+    d.rigs = registeredSeats
     w.__dolos = d
   }, [scene, camera, gl])
   return null

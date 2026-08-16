@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
 import { requireEnv } from './env'
+import { claudeCliCompleter } from './claudeCli'
 
 /**
  * 模型调用的最小接口。
@@ -149,12 +150,17 @@ export function makeCompleter(): Completer {
   const provider = (process.env.LLM_PROVIDER ?? 'anthropic').toLowerCase()
   const effort = (process.env.LLM_EFFORT as LlmConfig['effort']) ?? 'medium'
   switch (provider) {
+    case 'claude-cli':
+      // 本地 claude CLI —— 不需要 key，慢但能立刻跑
+      return claudeCliCompleter()
     case 'deepseek':
       return deepseekCompleter({})
     case 'anthropic':
       return anthropicCompleter({ effort, model: process.env.ANTHROPIC_MODEL })
     default:
-      throw new Error(`LLM_PROVIDER 只支持 anthropic | deepseek，收到「${provider}」`)
+      throw new Error(
+        `LLM_PROVIDER 只支持 anthropic | deepseek | claude-cli，收到「${provider}」`,
+      )
   }
 }
 

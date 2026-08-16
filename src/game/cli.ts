@@ -73,14 +73,25 @@ async function main() {
                         这条链路本身是通的，跟模型行不行无关
       --llm          —— 真 Anthropic，需要 ANTHROPIC_API_KEY
   */
-  const useLlm = flag('llm')
+  const useCli = flag('cli') // 用本地 claude CLI，不需要 key
+  const useLlm = flag('llm') || useCli
   const useFake = flag('fake')
   const rounds = opt('discussion', useLlm || useFake ? 2 : 0)
 
   const traces: { player: number; action: string; result: unknown }[] = []
+
+  // 真模型一局要几十次调用、好几分钟。事件是跑完才统一打印的，
+  // 中途没有任何输出会让人以为卡死了 —— 所以每次调用往 stderr 打一行进度。
+  // 走 stderr 是为了 `> log` 重定向时不污染那份可提交的记录。
+  let calls = 0
+  const progress = (t: { player: number; action: string }) => {
+    calls++
+    process.stderr.write(`\r  ${calls} 次调用 · 最近 P${t.player} ${t.action}          `)
+  }
   let completer: Completer | null = null
   if (useLlm) {
     try {
+      if (useCli) process.env.LLM_PROVIDER = 'claude-cli'
       completer = makeCompleter()
     } catch (e) {
       // key 缺失是最常见的情况，给一条能直接照做的路，别让人去读源码
@@ -97,14 +108,27 @@ async function main() {
     roles.map((_, i) =>
       completer
         ? new LlmAgent(`P${i}`, completer, {
-            onTrace: (t) => traces.push(t),
+            onTrace: (t) => {
+              traces.push(t)
+              if (useLlm) progress(t)
+            },
           })
         : new RuleBot(`P${i}`, 1000 + i),
     )
 
   if (flag('trace')) {
+    const t0 = Date.now()
     const r = await runGame(config(opt('seed', 42)), agents, rounds)
-    console.log(`\n=== ${PLAYERS} 人局 · 种子 ${opt('seed', 42)} ===\n`)
+    if (useLlm) process.stderr.write('\n')
+    console.log(`\n=== ${PLAYERS} 人局 · 种子 ${opt('seed', 42)} ===`)
+    if (useLlm) {
+      const provider = useCli ? '本地 claude CLI' : (process.env.LLM_PROVIDER ?? 'anthropic')
+      console.log(
+        `模型：${provider}　讨论轮数：${rounds}　` +
+          `调用 ${calls} 次　耗时 ${((Date.now() - t0) / 1000).toFixed(1)}s`,
+      )
+    }
+    console.log()
     for (const e of r.events) console.log(describe(e, r.roles))
     console.log(`\n非法动作次数：${r.illegalActions}　调用报错次数：${r.callErrors}`)
     if (r.callErrors > 0) {

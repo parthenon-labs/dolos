@@ -12,9 +12,10 @@ import {
   tableFloorY,
   type TableDef,
 } from '../hallLayout'
-import { Character } from '../Character'
+import { Character } from '../character/Character'
 import { LightShaft } from './LightShaft'
 import { Seat } from './Seat'
+import { TableChoreography } from './TableChoreography'
 
 /**
  * 一张桌子的全部：桌体、吊灯、光锥、椅子、坐着的人、牌。
@@ -37,6 +38,9 @@ export function TableUnit({ table, castShadows }: { table: TableDef; castShadows
       <LightShaft position={[0, TABLE_HEIGHT + 0.78, 0]} height={1.5} radius={1.4} />
       <Cards seats={table.seats} />
       <SpeakerRings tableId={table.id} seats={table.seats} />
+      {/* 编排只在玩家坐着的那张桌子上跑 —— 呈现状态是单桌的，
+          将来多桌同时进行时要按 tableId 分开存 */}
+      {seatedAt?.tableId === table.id && <TableChoreography seats={table.seats} />}
 
       {Array.from({ length: table.seats }, (_, i) => {
         const occ = occupancy[i] ?? null
