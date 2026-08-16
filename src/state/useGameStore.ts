@@ -29,11 +29,18 @@ const NAMES = [
   ['Pella', '#9a6b3f'],
   ['Vex', '#3f6b5a'],
   ['Gundy', '#8c5a5a'],
+  ['Ossa', '#5f7a4a'],
+  ['Rook', '#7a4a5f'],
+  ['Wren', '#4a6a7a'],
+  ['Bram', '#8a6a3a'],
 ] as const
 
 /**
  * Mock 占用数据。刻意留出空位，且每张桌子空的数量不同 ——
  * 走进大厅要一眼看出「哪桌能坐」。
+ *
+ * 二楼三桌留的空位更多：走上去发现没人可坐会很挫败，
+ * 得让那趟楼梯是有回报的。
  */
 function mockOccupancy(): Occupancy {
   // 每张桌子哪些座位是空的
@@ -42,6 +49,10 @@ function mockOccupancy(): Occupancy {
     t2: [2],
     t3: [0, 1, 4],
     t4: [1, 2, 3],
+    t5: [2, 4],
+    m1: [0, 2, 3],
+    m2: [1, 3],
+    m3: [0, 1, 3, 4],
   }
   let cursor = 0
   const out: Occupancy = {}

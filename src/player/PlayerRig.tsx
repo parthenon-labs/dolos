@@ -7,9 +7,13 @@ import {
   HALL,
   PLAYER_RADIUS,
   STAND_HEIGHT,
+  STEP_LIMIT,
+  floorHeightAt,
+  levelFromHeight,
   seatedCamera,
   standingSpot,
   tableById,
+  tableFloorY,
 } from '../scene/hallLayout'
 import { usePlayerStore } from '../state/usePlayerStore'
 
@@ -48,7 +52,6 @@ const easeInOutCubic = (t: number) =>
  * 输入方案：**不锁指针**，按住拖拽转视角，光标始终可见。
  * 代价是转视角要按住鼠标，不如 FPS 顺手；换来的是光标能去 hover 椅子、
  * 点牌、点按钮 —— 对一个牌桌游戏这笔交易是划算的。
- * 走动和落座共用同一套拖拽逻辑，只是角度限制不同。
  */
 export function PlayerRig() {
   const { camera, gl } = useThree()
@@ -58,10 +61,16 @@ export function PlayerRig() {
   const finishSit = usePlayerStore((s) => s.finishSit)
   const finishStand = usePlayerStore((s) => s.finishStand)
 
-  // 位置只维护水平分量，Y 由模式决定
-  // 出生在大厅后方靠墙处，yaw=0 面朝 -Z，也就是望进整个大厅。
-  const pos = useRef(new THREE.Vector2(0, 6.2))
+  // 位置只维护水平分量，脚下标高单独算
+  // 出生在南端入口，yaw=0 面朝 -Z，也就是望穿整条大厅。
+  const pos = useRef(new THREE.Vector2(0, 13.2))
   const vel = useRef(new THREE.Vector2())
+  /** 脚下地面标高 */
+  const groundY = useRef(0)
+  /** 平滑后的标高，上下楼梯时不至于一格一格顿 */
+  const smoothY = useRef(0)
+  const level = useRef<0 | 1>(0)
+
   const yaw = useRef(0)
   const pitch = useRef(-0.04)
   const targetYaw = useRef(0)
@@ -183,7 +192,7 @@ export function PlayerRig() {
       tween.current = {
         t: 0,
         dur: SIT_DURATION,
-        fromPos: new THREE.Vector3(pos.current.x, STAND_HEIGHT, pos.current.y),
+        fromPos: camera.position.clone(),
         toPos: new THREE.Vector3(...target.position),
         fromYaw: yaw.current,
         // 取和当前 yaw 最近的等价角，避免绕远路转一整圈
@@ -198,11 +207,16 @@ export function PlayerRig() {
       const table = tableById(seatedAt.tableId)
       if (!table) return
       const spot = standingSpot(table, seatedAt.seat)
+      const fy = tableFloorY(table)
+      // 起身要落回桌子所在的那一层，否则在二楼站起来会掉到一楼标高
+      groundY.current = fy
+      smoothY.current = fy
+      level.current = table.floor
       tween.current = {
         t: 0,
         dur: STAND_DURATION,
         fromPos: camera.position.clone(),
-        toPos: new THREE.Vector3(spot[0], STAND_HEIGHT, spot[1]),
+        toPos: new THREE.Vector3(spot[0], fy + STAND_HEIGHT, spot[1]),
         fromYaw: yaw.current,
         toYaw: yaw.current,
         fromPitch: pitch.current,
@@ -303,9 +317,21 @@ export function PlayerRig() {
     vel.current.x = THREE.MathUtils.damp(vel.current.x, tmp.x, ACCEL, dt)
     vel.current.y = THREE.MathUtils.damp(vel.current.y, tmp.y, ACCEL, dt)
 
-    const next = pos.current.clone().addScaledVector(vel.current, dt)
-    resolveCollisions(next)
-    pos.current.copy(next)
+    const dx = vel.current.x * dt
+    const dz = vel.current.y * dt
+
+    // 先整体走，被拦住就退化成只走一个轴 —— 这样贴着墙和栏杆走会"滑"过去，
+    // 而不是整个人黏住不动。分轴回退是最省事的滑动碰撞。
+    if (!attemptMove(dx, dz)) {
+      const okX = attemptMove(dx, 0)
+      const okZ = attemptMove(0, dz)
+      if (okX) vel.current.y = 0
+      else if (okZ) vel.current.x = 0
+      else vel.current.set(0, 0)
+    }
+
+    // 上下楼梯时把标高做平滑，否则每级台阶都会顿一下
+    smoothY.current = THREE.MathUtils.damp(smoothY.current, groundY.current, 16, dt)
 
     // 走路头部起伏，速度越快越明显
     const speed = vel.current.length()
@@ -314,16 +340,38 @@ export function PlayerRig() {
     const bob = Math.sin(bobPhase.current) * 0.028 * ratio
     const roll = Math.cos(bobPhase.current * 0.5) * 0.007 * ratio
 
-    camera.position.set(pos.current.x, STAND_HEIGHT + bob, pos.current.y)
+    camera.position.set(
+      pos.current.x,
+      smoothY.current + STAND_HEIGHT + bob,
+      pos.current.y,
+    )
     camera.rotation.set(pitch.current, yaw.current, roll)
+  }
+
+  /**
+   * 尝试位移。返回是否成功。
+   * 失败的唯一原因是脚下高度跨度超过一步 —— 墙和家具由 resolveCollisions
+   * 直接推开，不算失败。
+   */
+  function attemptMove(dx: number, dz: number): boolean {
+    if (dx === 0 && dz === 0) return true
+    const next = new THREE.Vector2(pos.current.x + dx, pos.current.y + dz)
+    resolveCollisions(next, level.current)
+    const h = floorHeightAt(next.x, next.y, level.current)
+    if (Math.abs(h - groundY.current) > STEP_LIMIT) return false
+    pos.current.copy(next)
+    groundY.current = h
+    level.current = levelFromHeight(h)
+    return true
   }
 
   return null
 }
 
 /** 圆形推出 + 墙体夹取。够用了，不需要物理引擎 */
-function resolveCollisions(p: THREE.Vector2) {
+function resolveCollisions(p: THREE.Vector2, level: 0 | 1) {
   for (const o of CIRCLE_OBSTACLES) {
+    if (o.level !== level) continue
     const dx = p.x - o.x
     const dz = p.y - o.z
     const d = Math.hypot(dx, dz)
@@ -334,7 +382,10 @@ function resolveCollisions(p: THREE.Vector2) {
     }
   }
 
-  for (const [minX, minZ, maxX, maxZ] of BOX_OBSTACLES) {
+  for (const box of BOX_OBSTACLES) {
+    if (box.level !== undefined && box.level !== level) continue
+    const [minX, minZ] = box.min
+    const [maxX, maxZ] = box.max
     const cx = THREE.MathUtils.clamp(p.x, minX, maxX)
     const cz = THREE.MathUtils.clamp(p.y, minZ, maxZ)
     const dx = p.x - cx

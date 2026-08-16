@@ -11,7 +11,9 @@ export function Lighting() {
   const c = useControls('大厅光照', {
     ambient: { value: 0.1, min: 0, max: 1, step: 0.01, label: '环境光' },
     ambientColor: { value: '#4a6a8c', label: '环境光色' },
-    fogDensity: { value: 0.052, min: 0, max: 0.2, step: 0.002, label: '雾浓度' },
+    // 空间拉长后雾要减淡，否则大厅深处直接糊成一片黑，纵深感反而没了。
+    // 雾的作用是分层，不是遮挡。
+    fogDensity: { value: 0.034, min: 0, max: 0.2, step: 0.002, label: '雾浓度' },
     fogColor: { value: '#0b0806', label: '雾色' },
   })
 

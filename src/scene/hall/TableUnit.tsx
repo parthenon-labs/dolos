@@ -9,6 +9,7 @@ import {
   TABLE_RADIUS,
   seatAngle,
   seatRingLocal,
+  tableFloorY,
   type TableDef,
 } from '../hallLayout'
 import { Character } from '../Character'
@@ -27,7 +28,10 @@ export function TableUnit({ table, castShadows }: { table: TableDef; castShadows
   const seatedAt = usePlayerStore((s) => s.seatedAt)
 
   return (
-    <group position={[table.pos[0], 0, table.pos[1]]} rotation={[0, table.rot, 0]}>
+    <group
+      position={[table.pos[0], tableFloorY(table), table.pos[1]]}
+      rotation={[0, table.rot, 0]}
+    >
       <TableBody />
       <Lamp castShadows={castShadows} />
       <LightShaft position={[0, TABLE_HEIGHT + 0.78, 0]} height={1.5} radius={1.4} />
