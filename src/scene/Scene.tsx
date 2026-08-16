@@ -6,7 +6,7 @@ import { useGameStore } from '../state/useGameStore'
 import { usePlayerStore } from '../state/usePlayerStore'
 import { PlayerRig } from '../player/PlayerRig'
 import { SeatPicker } from '../player/SeatPicker'
-import { TABLES } from './hallLayout'
+import { TABLES, tableById } from './hallLayout'
 import { Hall } from './hall/Hall'
 import { TableUnit } from './hall/TableUnit'
 import { Effects } from './Effects'
@@ -29,8 +29,10 @@ export function Scene() {
   // useEventBridge 那边一行不用改。
   const seated = usePlayerStore((s) => s.mode === 'seated')
   const seatedAt = usePlayerStore((s) => s.seatedAt)
-  const demoEvents = useDemoGame(seated)
-  useEventBridge(demoEvents, 5)
+  // 人数必须跟着实际桌子走 —— 写死 5 的话坐到 6 人桌上会少一个人的动画
+  const seatCount = seatedAt ? (tableById(seatedAt.tableId)?.seats ?? 5) : 5
+  const demoEvents = useDemoGame(seated, seatCount)
+  useEventBridge(demoEvents, seatCount)
 
   // 告诉 rig 登记表手势该往哪张桌子发。
   // cue 只知道座位号 —— 一局游戏只发生在一张桌子上，桌号是外部上下文。

@@ -17,11 +17,14 @@ export function Seat({
   index,
   seatCount,
   empty,
+  mine = false,
 }: {
   tableId: string
   index: number
   seatCount: number
   empty: boolean
+  /** 玩家正坐在这把椅子上 */
+  mine?: boolean
 }) {
   const glow = useRef<THREE.MeshBasicMaterial>(null)
   const mode = usePlayerStore((s) => s.mode)
@@ -49,11 +52,17 @@ export function Seat({
         <boxGeometry args={[0.42, 0.06, 0.42]} />
         <meshStandardMaterial color="#2a1c14" roughness={0.85} />
       </mesh>
-      {/* 靠背 */}
+      {/*
+        靠背。**自己坐的那把不画** —— 相机后拉到 2.67m 之后就在椅背后面了，
+        不藏起来的话画面下三分之一是一块深色木板。
+        只影响自己这一台的渲染，别人看到的那把椅子照常在。
+      */}
+      {!mine && (
       <mesh position={[0, 0.74, 0.2]} castShadow>
         <boxGeometry args={[0.42, 0.56, 0.05]} />
         <meshStandardMaterial color="#241811" roughness={0.85} />
       </mesh>
+      )}
       {/* 四条腿 */}
       {[
         [-0.17, -0.17],

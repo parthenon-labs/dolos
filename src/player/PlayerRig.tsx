@@ -12,6 +12,8 @@ import {
   floorHeightAt,
   levelFromHeight,
   seatedCamera,
+  seatedFov,
+  seatedPullback,
   standingSpot,
   tableById,
   tableFloorY,
@@ -28,7 +30,19 @@ const STAND_DURATION = 0.85
  * 转场时平滑过渡，那一下"镜头收拢"是坐下动作里很关键的一半。
  */
 const FOV_WALK = 72
-const FOV_SEATED = 60
+/**
+ * 坐下时的 fov 不是常数 —— 它取决于这桌几个人、相机后拉多少、
+ * 以及**当前画面比例**。写死的话把窗口拖窄就会把边上的人切掉，
+ * 而这种问题在自己那台显示器上永远复现不出来。推导见 hallLayout.seatedFov。
+ */
+function fovSeatedFor(
+  seatedAt: { tableId: string; seat: number } | null,
+  aspect: number,
+): number {
+  const t = seatedAt ? tableById(seatedAt.tableId) : undefined
+  if (!t) return FOV_WALK
+  return seatedFov(t.seats, seatedPullback(t), aspect)
+}
 
 // 落座后视角夹在朝向桌心的 ±78° 内 —— 你是坐着的，不该能转 360°。
 // 走动时 yaw 不设限，pitch 仍然要夹，否则能翻到脑后。
@@ -265,8 +279,9 @@ export function PlayerRig() {
       tw.t = Math.min(1, tw.t + dt / tw.dur)
       const k = easeInOutCubic(tw.t)
       camera.position.lerpVectors(tw.fromPos, tw.toPos, k)
-      const fovFrom = tw.kind === 'sit' ? FOV_WALK : FOV_SEATED
-      const fovTo = tw.kind === 'sit' ? FOV_SEATED : FOV_WALK
+      const seatedFovNow = fovSeatedFor(seatedAt, cam.aspect)
+      const fovFrom = tw.kind === 'sit' ? FOV_WALK : seatedFovNow
+      const fovTo = tw.kind === 'sit' ? seatedFovNow : FOV_WALK
       cam.fov = THREE.MathUtils.lerp(fovFrom, fovTo, k)
       cam.updateProjectionMatrix()
 
@@ -295,6 +310,14 @@ export function PlayerRig() {
     }
 
     if (mode === 'seated') {
+      // 窗口拖动会改变 aspect，需要的 fov 也跟着变。每帧比一下比监听 resize 可靠：
+      // R3F 自己也是在渲染循环里更新 aspect 的，监听事件容易差一帧。
+      const want = fovSeatedFor(seatedAt, cam.aspect)
+      if (Math.abs(cam.fov - want) > 0.05) {
+        cam.fov = want
+        cam.updateProjectionMatrix()
+      }
+
       yaw.current = THREE.MathUtils.damp(yaw.current, targetYaw.current, 8, dt)
       pitch.current = THREE.MathUtils.damp(pitch.current, targetPitch.current, 8, dt)
       // 极轻微的呼吸摇晃。没有它画面会"死"成一张静态图；幅度必须很小，大了会晕

@@ -54,6 +54,7 @@ export function TableUnit({ table, castShadows }: { table: TableDef; castShadows
               index={i}
               seatCount={table.seats}
               empty={occ === null}
+              mine={isMe}
             />
             {occ && !isMe && (
               <Character

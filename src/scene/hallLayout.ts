@@ -27,11 +27,83 @@ export const SEAT_RADIUS = 1.62
 export const EYE_HEIGHT = 1.34
 /** 站立视线高度 */
 export const STAND_HEIGHT = 1.68
+/** 角色躯干半宽，算出画判定时要把它算进去，不能只看座位中心点 */
+const SHOULDER = 0.3
+/** 视锥边缘再留一点，别让人贴着画框 */
+const FRAME_MARGIN_DEG = 2.5
+
 /**
- * 相机比座位再往后一点 —— 相当于"靠在椅背上"。
- * 纯粹是构图需要：贴着桌沿的话桌面会吃掉半个画面。
+ * 坐下时相机沿径向后拉多少（相对座位半径的倍数）。
+ *
+ * **为什么要后拉**：座位均分整圈、人人朝桌心时，最边上那个人的偏轴角
+ * 是 `90° − 180°/n`。n=6 就是 60°，远超任何合理的视角 —— 邻座直接出画。
+ * 相机往后退能把整桌人压进视锥。
+ *
+ * 试过、不行的方案：把座位排成弧形。
+ * 偏轴角只取决于**角间距**，弧形把 n 个人压进更小的张角，间距反而变小：
+ * 6 人排成 180° 弧，邻座从 47° 恶化到 73.8°。而 300° 的弧和整圈是
+ * 同一个几何（都是 60° 间距），改了等于没改。
+ * 弧形唯一的实际效果是让各座位视野不再等价 —— 在社交推理游戏里
+ * 那是把座位变成信息优势，比构图问题严重得多。
  */
-export const CAMERA_PULLBACK = 1.3
+function pullbackBySeats(seats: number): number {
+  if (seats <= 4) return 1.45
+  if (seats === 5) return 1.65
+  return 1.8
+}
+
+/**
+ * 实际用的后拉，受桌子所在位置的净空限制。
+ *
+ * m3 在挑台北端那条 4.4 米深的连接段上，相机半径超过 2.1 米就会穿出栏杆
+ * 悬在中庭上方。**这是宽度不够，不是参数没调好** —— 所以让桌子自己声明上限，
+ * 视角那边按实际拿到的后拉去算需要多大 fov。
+ */
+export function seatedPullback(table: TableDef): number {
+  return Math.min(pullbackBySeats(table.seats), table.maxPullback ?? Infinity)
+}
+
+/** 最边上那个人（含肩宽和余量）需要多大的**水平半视角**，单位度 */
+export function requiredHalfFov(seats: number, pullback: number): number {
+  let mx = 0
+  for (let j = 1; j < seats; j++) {
+    const d = (j / seats) * Math.PI * 2
+    const dx = Math.sin(d) * SEAT_RADIUS
+    const dz = Math.cos(d) * SEAT_RADIUS - SEAT_RADIUS * pullback
+    const dist = Math.hypot(dx, dz)
+    const cos = (SEAT_RADIUS * pullback - Math.cos(d) * SEAT_RADIUS) / dist
+    const ang = Math.acos(Math.max(-1, Math.min(1, cos))) * (180 / Math.PI)
+    mx = Math.max(mx, ang + Math.atan(SHOULDER / dist) * (180 / Math.PI))
+  }
+  return mx + FRAME_MARGIN_DEG
+}
+
+/** 坐下时的垂直 fov 下限 */
+export const FOV_SEATED_MIN = 58
+/** 上限。再大边缘畸变就明显了 —— 与其硬塞，不如把一桌人数卡在 6 */
+export const FOV_SEATED_MAX = 74
+
+/**
+ * 坐下时该用多大的垂直 fov。
+ *
+ * **必须按画面比例实时算，不能写死。** 同一个 63° 在 16:9 下水平半视角
+ * 47.5°、在 3:2 下只有 42.6° —— 写死的话换台笔记本或者把窗口拖窄，
+ * 边上的人就被切掉了，而这种问题在自己机器上永远复现不出来。
+ */
+export function seatedFov(seats: number, pullback: number, aspect: number): number {
+  const halfH = requiredHalfFov(seats, pullback) * (Math.PI / 180)
+  const v = 2 * Math.atan(Math.tan(halfH) / aspect) * (180 / Math.PI)
+  return Math.max(FOV_SEATED_MIN, Math.min(FOV_SEATED_MAX, v))
+}
+
+/**
+ * 一桌最多几个人。
+ *
+ * **这是呈现层的限制，不是规则限制** —— `game/rules.ts` 支持到 10 人，
+ * 那份表是对的，别去动它（7 人基线还要靠它跑）。
+ * 卡在 6 是因为再多就得把 fov 推到畸变明显的区间。
+ */
+export const MAX_SEATS = 6
 
 /* ---------------- 二楼挑台 ---------------- */
 
@@ -102,19 +174,27 @@ export type TableDef = {
   seats: number
   /** 0 = 一层，1 = 二层挑台 */
   floor: 0 | 1
+  /** 净空不够时给相机后拉设个上限，见 seatedPullback */
+  maxPullback?: number
 }
 
+/**
+ * 桌子人数是混的，不是全都顶格 —— 大厅里一眼能看出"那桌是满编局"。
+ *
+ * 挑台上全是 4 人桌：挑台净宽 5 米，6 人桌相机要 2.51 米半径，
+ * 会穿到栏杆外面悬在中庭上。这不是可以调参数解决的，是宽度不够。
+ */
 export const TABLES: TableDef[] = [
   // 一层
-  { id: 't1', pos: [-3.0, 8.6], rot: 0.34, seats: 5, floor: 0 },
+  { id: 't1', pos: [-3.0, 8.6], rot: 0.34, seats: 6, floor: 0 },
   { id: 't2', pos: [3.2, 7.0], rot: -0.52, seats: 5, floor: 0 },
-  { id: 't3', pos: [-2.6, 0.6], rot: 0.95, seats: 5, floor: 0 },
+  { id: 't3', pos: [-2.6, 0.6], rot: 0.95, seats: 6, floor: 0 },
   { id: 't4', pos: [2.9, -2.4], rot: -0.18, seats: 4, floor: 0 },
-  { id: 't5', pos: [-1.2, -7.6], rot: 0.6, seats: 5, floor: 0 },
+  { id: 't5', pos: [-1.2, -7.6], rot: 0.6, seats: 6, floor: 0 },
   // 二层挑台
   { id: 'm1', pos: [-7.4, -1.2], rot: 0.25, seats: 4, floor: 1 },
   { id: 'm2', pos: [7.4, -1.2], rot: -0.3, seats: 4, floor: 1 },
-  { id: 'm3', pos: [0, -12.7], rot: 0.1, seats: 5, floor: 1 },
+  { id: 'm3', pos: [0, -12.8], rot: 0.1, seats: 4, floor: 1, maxPullback: 1.3 },
 ]
 
 export const tableFloorY = (t: TableDef) => (t.floor === 1 ? FLOOR2_Y : 0)
@@ -183,11 +263,8 @@ export function seatedCamera(
   i: number,
 ): { position: [number, number, number]; yaw: number } {
   const local = seatLocal(i, table.seats)
-  const pulled: [number, number, number] = [
-    local[0] * CAMERA_PULLBACK,
-    EYE_HEIGHT,
-    local[2] * CAMERA_PULLBACK,
-  ]
+  const p = seatedPullback(table)
+  const pulled: [number, number, number] = [local[0] * p, EYE_HEIGHT, local[2] * p]
   const w = toWorld(table, pulled)
   // 座位朝向桌心是 seatFacing，叠加桌子自身旋转
   return { position: w, yaw: seatFacing(i, table.seats) + table.rot }

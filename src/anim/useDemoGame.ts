@@ -12,7 +12,7 @@ import type { GameEvent } from '../game/types'
  *
  * 接了 WebSocket 之后整个文件删掉，`useEventBridge` 那边一行都不用改。
  */
-export function useDemoGame(enabled: boolean, intervalMs = 1600) {
+export function useDemoGame(enabled: boolean, playerCount = 5, intervalMs = 1600) {
   const [events, setEvents] = useState<GameEvent[]>([])
 
   useEffect(() => {
@@ -25,7 +25,11 @@ export function useDemoGame(enabled: boolean, intervalMs = 1600) {
 
     ;(async () => {
       const r = await runGame(
-        { playerCount: 5, optionalRoles: ['percival', 'morgana'], seed: Date.now() % 9973 },
+        {
+          playerCount,
+          optionalRoles: ['percival', 'morgana'],
+          seed: Date.now() % 9973,
+        },
         (roles) => roles.map((_, i) => new RuleBot(`P${i}`, 900 + i)),
       )
       if (cancelled) return
@@ -45,7 +49,7 @@ export function useDemoGame(enabled: boolean, intervalMs = 1600) {
       cancelled = true
       if (timer) clearInterval(timer)
     }
-  }, [enabled, intervalMs])
+  }, [enabled, playerCount, intervalMs])
 
   return events
 }
