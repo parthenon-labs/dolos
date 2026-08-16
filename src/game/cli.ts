@@ -8,6 +8,9 @@
  * 这个游戏的规则实现对不对，以及 agent 到底会不会玩。
  */
 import { RuleBot } from './bots'
+import { LlmAgent } from './llmAgent'
+import { anthropicCompleter, type Completer } from './llm'
+import { fakeCompleter } from './fakeLlm'
 import { runGame } from './runner'
 import { evilCount } from './rules'
 import { type GameConfig, type GameEvent, type Role, isEvil } from './types'
@@ -59,13 +62,48 @@ function describe(e: GameEvent, roles: Role[]): string {
 }
 
 async function main() {
-  const agents = (roles: Role[]) => roles.map((_, i) => new RuleBot(`P${i}`, 1000 + i))
+  /*
+    三种对手：
+      规则 bot（默认）—— 基线尺子，确定性、免费、28000 局/秒
+      --fake         —— 假 LLM，走完整的 LLM 管线但不联网。
+                        用来验证 prompt 构造 / 结构化输出解析 / 防泄漏 / 竞价发言
+                        这条链路本身是通的，跟模型行不行无关
+      --llm          —— 真 Anthropic，需要 ANTHROPIC_API_KEY
+  */
+  const useLlm = flag('llm')
+  const useFake = flag('fake')
+  const rounds = opt('discussion', useLlm || useFake ? 2 : 0)
+
+  const traces: { player: number; action: string; result: unknown }[] = []
+  const completer: Completer | null = useLlm
+    ? anthropicCompleter({ effort: 'medium' })
+    : useFake
+      ? fakeCompleter(opt('seed', 42))
+      : null
+
+  const agents = (roles: Role[]) =>
+    roles.map((_, i) =>
+      completer
+        ? new LlmAgent(`P${i}`, completer, {
+            onTrace: (t) => traces.push(t),
+          })
+        : new RuleBot(`P${i}`, 1000 + i),
+    )
 
   if (flag('trace')) {
-    const r = await runGame(config(opt('seed', 42)), agents)
+    const r = await runGame(config(opt('seed', 42)), agents, rounds)
     console.log(`\n=== ${PLAYERS} 人局 · 种子 ${opt('seed', 42)} ===\n`)
     for (const e of r.events) console.log(describe(e, r.roles))
-    console.log(`\n非法动作次数：${r.illegalActions}\n`)
+    console.log(`\n非法动作次数：${r.illegalActions}`)
+    const blocked = traces.filter((t) => t.action === 'speech_blocked')
+    if (blocked.length > 0) {
+      console.log(`\n被防泄漏层拦下的发言 ${blocked.length} 条：`)
+      for (const b of blocked) {
+        const r2 = b.result as { speech: string; leak: string }
+        console.log(`  ${b.player} 号想说「${r2.speech}」→ 拦截：${r2.leak}`)
+      }
+    }
+    console.log()
     return
   }
 
@@ -78,7 +116,7 @@ async function main() {
   const t0 = Date.now()
 
   for (let i = 0; i < GAMES; i++) {
-    const r = await runGame(config(i), agents)
+    const r = await runGame(config(i), agents, rounds)
     if (r.winner === 'good') good++
     illegal += r.illegalActions
     reasons[r.reason] = (reasons[r.reason] ?? 0) + 1
@@ -110,8 +148,11 @@ async function main() {
   console.log(`\n非法动作总数 ${illegal}（规则 bot 应为 0）`)
   console.log(`耗时 ${ms}ms，${(GAMES / (ms / 1000)).toFixed(0)} 局/秒\n`)
 
+  const blockedAll = traces.filter((t) => t.action === 'speech_blocked').length
+  if (completer) console.log(`防泄漏层共拦下 ${blockedAll} 条发言`)
+
   // 自检：坏人数量、角色分布必须符合规则
-  const r = await runGame(config(7), agents)
+  const r = await runGame(config(7), agents, 0)
   const evil = r.roles.filter(isEvil).length
   const expect = evilCount(PLAYERS)
   console.log(

@@ -40,6 +40,8 @@ const MAX_RETRIES = 3
 export async function runGame(
   config: GameConfig,
   makeAgents: (roles: GameState['roles']) => Agent[],
+  /** 每次提名前的讨论轮数。规则 bot 不发言，设 0 即可 */
+  discussionRounds = 0,
 ): Promise<GameResult> {
   let { state, events } = startGame(config)
   const agents = makeAgents(state.roles)
@@ -67,8 +69,57 @@ export async function runGame(
     return fallback
   }
 
+  /**
+   * 提名前的自由讨论，用竞价决定谁说话。
+   *
+   * 抄自 Google Research 的 Werewolf Arena：每个人报一个 0-4 的发言意愿，
+   * 最高者发言，平手时**上一轮被点名的人优先**。
+   * "何时插话"是语音社交推理里最难的一环，固定轮流发言在阿瓦隆里尤其失真 ——
+   * 真实的讨论是抢话的。这套机制现在跑在文字上，
+   * 将来接语音时可以原样复用：竞价就是抢麦。
+   */
+  async function discussion(rounds: number) {
+    if (rounds <= 0) return
+    let lastMentioned = new Set<PlayerId>()
+
+    for (let r = 0; r < rounds; r++) {
+      const bids: { p: PlayerId; bid: number }[] = []
+      for (let p = 0; p < config.playerCount; p++) {
+        const a = agents[p]
+        if (!a.bid || !a.speak) continue
+        const v = project(state, p)
+        const bid = await guard(
+          () => a.bid!(v),
+          (x) => (Number.isFinite(x) ? null : '出价必须是数字'),
+          0,
+        )
+        bids.push({ p, bid })
+      }
+      if (bids.length === 0) return
+
+      const top = Math.max(...bids.map((b) => b.bid))
+      if (top <= 0) return // 没人想说，讨论自然结束
+      const contenders = bids.filter((b) => b.bid === top).map((b) => b.p)
+      // 平手时被点名的人优先回应
+      const preferred = contenders.filter((p) => lastMentioned.has(p))
+      const speaker = (preferred.length > 0 ? preferred : contenders)[0]
+
+      const text = await guard(
+        () => agents[speaker].speak!(project(state, speaker)),
+        (x) => (typeof x === 'string' ? null : '发言必须是字符串'),
+        '',
+      )
+      if (!text) continue
+      emit({ t: 'speech', player: speaker, text })
+      lastMentioned = new Set(
+        [...text.matchAll(/(\d+)\s*号/g)].map((m) => Number(m[1])),
+      )
+    }
+  }
+
   while (state.phase !== 'ended') {
     if (state.phase === 'proposal') {
+      await discussion(discussionRounds)
       const leader = state.leader
       const view = project(state, leader)
       const fallback = fallbackTeam(state, leader)
