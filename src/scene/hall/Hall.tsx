@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { MeshReflectorMaterial } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { BAR, FLOOR2_Y, HALL } from '../hallLayout'
+import { BAR, FLOOR2_Y, HALL, nudgeOutOfObstacles } from '../hallLayout'
 import { usePlayerStore } from '../../state/usePlayerStore'
 import { DustMotes } from './DustMotes'
 import { Mezzanine } from './Mezzanine'
@@ -120,7 +120,8 @@ function Floor() {
         // 拖拽转视角时不该顺带下达一个"走过去"的指令。
         if (e.delta > 4) return
         e.stopPropagation()
-        setMoveTarget([e.point.x, e.point.z])
+        // 点在桌子上是很自然的操作，但桌心走不到 —— 推到旁边可站的位置
+        setMoveTarget(nudgeOutOfObstacles(e.point.x, e.point.z, 0))
       }}
     >
       <planeGeometry args={[HALL.width, HALL.depth]} />

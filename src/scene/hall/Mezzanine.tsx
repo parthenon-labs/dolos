@@ -5,6 +5,7 @@ import {
   MEZZ_RECTS,
   SLAB,
   STAIRS,
+  nudgeOutOfObstacles,
 } from '../hallLayout'
 import { usePlayerStore } from '../../state/usePlayerStore'
 
@@ -54,7 +55,7 @@ function Slabs() {
                 // 二楼地面同样可以点着走
                 if (e.delta > 4) return
                 e.stopPropagation()
-                setMoveTarget([e.point.x, e.point.z])
+                setMoveTarget(nudgeOutOfObstacles(e.point.x, e.point.z, 1))
               }}
             >
               <planeGeometry args={[w, d]} />

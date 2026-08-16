@@ -253,6 +253,53 @@ export type BoxObstacle = {
   level?: 0 | 1
 }
 
+/**
+ * 把一个点推到所有障碍物之外。
+ *
+ * 点击寻路时用：直接点在桌子上是很自然的操作，但桌心是走不到的，
+ * 不处理的话玩家会顶着桌子一直推。推到最近的可站位置，
+ * 语义就变成了"走到那张桌子旁边"，反而更符合预期。
+ */
+export function nudgeOutOfObstacles(
+  x: number,
+  z: number,
+  level: 0 | 1,
+): [number, number] {
+  for (const o of CIRCLE_OBSTACLES) {
+    if (o.level !== level) continue
+    const dx = x - o.x
+    const dz = z - o.z
+    const d = Math.hypot(dx, dz)
+    const min = o.r + PLAYER_RADIUS + 0.08
+    if (d < min) {
+      if (d < 1e-4) {
+        x = o.x + min
+        z = o.z
+      } else {
+        x = o.x + (dx / d) * min
+        z = o.z + (dz / d) * min
+      }
+    }
+  }
+  for (const box of BOX_OBSTACLES) {
+    if (box.level !== undefined && box.level !== level) continue
+    const [minX, minZ] = box.min
+    const [maxX, maxZ] = box.max
+    if (x < minX || x > maxX || z < minZ || z > maxZ) continue
+    // 点落在盒子里：往最近的一条边推出去
+    const cand: [number, number, number][] = [
+      [Math.abs(x - minX), minX - PLAYER_RADIUS - 0.08, z],
+      [Math.abs(maxX - x), maxX + PLAYER_RADIUS + 0.08, z],
+      [Math.abs(z - minZ), x, minZ - PLAYER_RADIUS - 0.08],
+      [Math.abs(maxZ - z), x, maxZ + PLAYER_RADIUS + 0.08],
+    ]
+    cand.sort((a, b) => a[0] - b[0])
+    x = cand[0][1]
+    z = cand[0][2]
+  }
+  return [x, z]
+}
+
 export const BOX_OBSTACLES: BoxObstacle[] = [
   // 吧台台身（含台面外沿）与酒柜，整体贴西墙
   { min: [-10, -4.2], max: [-8.0, 5.2], level: 0 },

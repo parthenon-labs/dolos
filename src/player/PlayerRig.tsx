@@ -72,10 +72,20 @@ export function PlayerRig() {
   const setMoveTarget = usePlayerStore((s) => s.setMoveTarget)
 
   const ctrl = useControls('操作', {
-    autoFace: { value: true, label: '自动转向' },
+    steering: {
+      value: 'turn',
+      options: {
+        'A/D 转向 · W/S 前后': 'turn',
+        'WASD 平移 · 拖拽转视角': 'strafe',
+      },
+      label: '操作方式',
+    },
+    turnSpeed: { value: 2.2, min: 0.8, max: 5, step: 0.1, label: '转向速度' },
   })
-  const autoFace = useRef(ctrl.autoFace)
-  autoFace.current = ctrl.autoFace
+  const steering = useRef(ctrl.steering)
+  steering.current = ctrl.steering
+  const turnSpeed = useRef(ctrl.turnSpeed)
+  turnSpeed.current = ctrl.turnSpeed
 
   const moveTargetRef = useRef(moveTarget)
   moveTargetRef.current = moveTarget
@@ -305,40 +315,43 @@ export function PlayerRig() {
 
   function stepWalking(dt: number) {
     const k = keys.current
-    let ix = 0
-    let iz = 0
-    if (k['KeyW'] || k['ArrowUp']) iz -= 1
-    if (k['KeyS'] || k['ArrowDown']) iz += 1
-    if (k['KeyA'] || k['ArrowLeft']) ix -= 1
-    if (k['KeyD'] || k['ArrowRight']) ix += 1
-    const hasKeys = ix !== 0 || iz !== 0
+    const turnMode = steering.current === 'turn'
 
+    // 一次算清这一帧的前后 / 左右意图。
+    // turn 模式：A/D 是转向，横向平移交给 Q/E（微调站位时才用得上）
+    // strafe 模式：A/D 是平移，转向靠拖拽鼠标
+    const fwd =
+      (k['KeyW'] || k['ArrowUp'] ? 1 : 0) - (k['KeyS'] || k['ArrowDown'] ? 1 : 0)
+    const turn =
+      turnMode
+        ? (k['KeyA'] || k['ArrowLeft'] ? 1 : 0) - (k['KeyD'] || k['ArrowRight'] ? 1 : 0)
+        : 0
+    const strafe = turnMode
+      ? (k['KeyE'] ? 1 : 0) - (k['KeyQ'] ? 1 : 0)
+      : (k['KeyD'] || k['ArrowRight'] ? 1 : 0) - (k['KeyA'] || k['ArrowLeft'] ? 1 : 0)
+
+    const hasKeys = fwd !== 0 || turn !== 0 || strafe !== 0
     // 有键盘输入就取消点击寻路 —— 手动永远优先
     if (hasKeys && moveTargetRef.current) setMoveTarget(null)
 
+    // A/D 直接改朝向。**这是"准"的来源**：W 永远精确等于当前朝向，
+    // 按下去走的方向和屏幕上的"前"是同一个，中间没有过渡期。
+    //
+    // 之前那版把 WASD 做成世界方向、再让镜头去追移动方向，问题就出在过渡期上：
+    // 朝北站着按 D，人立刻往东走，镜头却要半秒才转过来，那半秒里
+    // 按键方向和屏幕方向对不上 —— 而且第一人称里根本没有"北"的视觉锚点。
+    if (turn !== 0) targetYaw.current += turn * turnSpeed.current * dt
+
     tmp.set(0, 0)
 
-    if (hasKeys) {
-      if (autoFace.current) {
-        // 自动转向模式下，WASD 是**世界方向**而不是相对镜头。
-        // 必须如此：如果 A 表示"相对镜头往左"，而镜头又会转去朝向移动方向，
-        // 两者会互相追着跑，人会原地打转。
-        // 世界方向 + 镜头跟随，是唯一稳定的组合。
-        const len = Math.hypot(ix, iz)
-        tmp.set((ix / len) * WALK_SPEED, (iz / len) * WALK_SPEED)
-      } else {
-        // 手动转向模式：输入向量绕 yaw 旋转到世界方向。
-        //   x' = vx*cos + vz*sin
-        //   z' = -vx*sin + vz*cos
-        // 校验：W 给 (0,-1) → (-sin, -cos)，正是 yaw 对应的前方（three 里 -Z 为前）。
-        const len = Math.hypot(ix, iz)
-        const nx = ix / len
-        const nz = iz / len
-        const c = Math.cos(yaw.current)
-        const s = Math.sin(yaw.current)
-        tmp.set(nx * c + nz * s, -nx * s + nz * c)
-        tmp.multiplyScalar(WALK_SPEED)
-      }
+    if (fwd !== 0 || strafe !== 0) {
+      // 前方 = (-sin y, -cos y)，右方 = (cos y, -sin y)
+      const c = Math.cos(yaw.current)
+      const s = Math.sin(yaw.current)
+      const vx = -s * fwd + c * strafe
+      const vz = -c * fwd - s * strafe
+      const len = Math.hypot(vx, vz)
+      tmp.set((vx / len) * WALK_SPEED, (vz / len) * WALK_SPEED)
     } else if (moveTargetRef.current) {
       // 朝点击的目的地直走。没有寻路，撞到东西会沿着障碍滑 ——
       // 一个开阔的厅里够用了，真要绕柱子再说。
@@ -353,21 +366,15 @@ export function PlayerRig() {
         // 快到了就减速，否则会冲过头再倒回来，很难看
         const speed = WALK_SPEED * Math.min(1, dist / 1.2)
         tmp.set((dx / dist) * speed, (dz / dist) * speed)
-        // 卡住检测：贴着墙原地蹭的时候直接放弃，别让玩家一直顶着
-        if (vel.current.lengthSq() < 0.15) {
-          stuckFrames.current++
-          if (stuckFrames.current > 45) {
-            setMoveTarget(null)
-            stuckFrames.current = 0
-          }
-        } else stuckFrames.current = 0
       }
     }
 
-    // 自动转向：镜头平滑地转到"正在走的方向"。
+    // 自动转向**只在点击寻路时生效**。
+    // 用键盘走的时候玩家自己在用 A/D 掌舵，镜头再去抢方向就会打架。
     // 阈值是为了在停下时保持朝向 —— 速度掉到 0 时方向向量会抖，
     // 不设阈值镜头会在停步瞬间乱甩。
-    if (autoFace.current && !dragging.current) {
+    const following = !!moveTargetRef.current && !hasKeys && !dragging.current
+    if (following) {
       const v = vel.current
       if (v.lengthSq() > FACE_THRESHOLD * FACE_THRESHOLD) {
         // forward = (-sin y, -cos y)，反解出 y
@@ -379,7 +386,7 @@ export function PlayerRig() {
     yaw.current = THREE.MathUtils.damp(
       yaw.current,
       targetYaw.current,
-      autoFace.current && !dragging.current ? TURN_RATE : 22,
+      following ? TURN_RATE : 22,
       dt,
     )
     pitch.current = THREE.MathUtils.damp(pitch.current, targetPitch.current, 22, dt)
@@ -388,6 +395,8 @@ export function PlayerRig() {
     vel.current.x = THREE.MathUtils.damp(vel.current.x, tmp.x, ACCEL, dt)
     vel.current.y = THREE.MathUtils.damp(vel.current.y, tmp.y, ACCEL, dt)
 
+    const prevX = pos.current.x
+    const prevZ = pos.current.y
     const dx = vel.current.x * dt
     const dz = vel.current.y * dt
 
@@ -399,6 +408,22 @@ export function PlayerRig() {
       if (okX) vel.current.y = 0
       else if (okZ) vel.current.x = 0
       else vel.current.set(0, 0)
+    }
+
+    /*
+      卡住检测必须看**实际位移**，不能看速度。
+      顶着桌子推的时候速度一直是满的，只是每帧都被碰撞推回原处 ——
+      按速度判断的话永远判不出卡住，玩家会一直贴着桌子抖。
+    */
+    if (moveTargetRef.current && !hasKeys) {
+      const moved = Math.hypot(pos.current.x - prevX, pos.current.y - prevZ)
+      if (moved < 0.004) {
+        stuckFrames.current++
+        if (stuckFrames.current > 40) {
+          setMoveTarget(null)
+          stuckFrames.current = 0
+        }
+      } else stuckFrames.current = 0
     }
 
     // 上下楼梯时把标高做平滑，否则每级台阶都会顿一下
