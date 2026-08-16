@@ -15,7 +15,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["@react-three/fiber", "vite/client"]
+    "types": ["@react-three/fiber", "vite/client", "node"]
   },
   "include": ["src", "vite.config.ts"]
 }
