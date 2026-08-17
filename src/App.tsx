@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 import * as THREE from 'three'
 import { Scene } from './scene/Scene'
 import { Hud } from './ui/Hud'
-import { MatchView } from './ui/match/MatchView'
+import { PokerTable } from './ui/poker/PokerTable'
 
 export default function App() {
   return (
@@ -24,11 +24,11 @@ export default function App() {
       </Canvas>
       <Hud />
       {/*
-        对局界面盖在 3D 上面，而不是替换掉它。
+        牌桌界面盖在 3D 上面，而不是替换掉它。
         3D 继续渲染是有意的：离席时能直接切回大厅，不用重建整个场景；
-        将来刺杀揭晓要切回桌上，也只是把这一层淡出。
+        将来摊牌要切回 3D 桌上，也只是把这一层淡出。
       */}
-      <MatchView />
+      <PokerTable />
     </>
   )
 }

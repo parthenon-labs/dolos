@@ -8,7 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "game": "tsx src/game/cli.ts",
-    "check:leak": "tsx src/game/leakGuard.check.ts"
+    "check:leak": "tsx src/game/leakGuard.check.ts",
+    "check:poker": "tsx src/poker/evaluate.check.ts",
+    "check:engine": "tsx src/poker/engine.check.ts",
+    "check": "npm run check:leak && npm run check:poker && npm run check:engine"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

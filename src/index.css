@@ -665,3 +665,263 @@ footer {
 .action-bar button.reject  { background: #451512; border-color: #7a2a1f; color: #f0a89c; }
 .action-bar button.danger  { background: #451512; border-color: #7a2a1f; color: #f0a89c; }
 .action-bar.assassin { background: #150c0a; }
+
+/* =========================================================
+   德州扑克桌（全屏，盖在 3D 之上）
+
+   配色沿用大厅的暖木和暗琥珀，桌面用深绿绒 —— 玩家是从那个酒馆
+   走进来的，换一套冷色调会像切到了另一个产品。
+   ========================================================= */
+
+.poker {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: 1fr 260px;
+  grid-template-areas: 'top top' 'felt log' 'foot foot';
+  background: radial-gradient(120% 90% at 50% 0%, #17110c 0%, #0c0806 60%, #060404 100%);
+  color: #e8ddd0;
+  font: 14px/1.55 system-ui, -apple-system, 'PingFang SC', sans-serif;
+}
+
+.poker-top {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 11px 20px;
+  border-bottom: 1px solid #2a1d14;
+  background: #100b08;
+}
+.poker-top .brand { font: 600 13px/1 system-ui; letter-spacing: .32em; color: #c9a227; }
+.poker-top .hand-no { color: #b9a894; }
+.poker-top .blinds { color: #8a7663; font-size: 13px; }
+.poker-top .playmoney {
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid #3a2a1e;
+  border-radius: 5px;
+  color: #7d6a58;
+  font-size: 12px;
+}
+
+/* ---------- 牌桌 ---------- */
+
+.felt {
+  grid-area: felt;
+  position: relative;
+  margin: 22px;
+  border-radius: 50% / 34%;
+  background: radial-gradient(70% 70% at 50% 42%, #1c4a34 0%, #0f2c20 62%, #0a1f16 100%);
+  background-color: #0f2c20;
+  border: 10px solid #2a1a12;
+  box-shadow: inset 0 0 90px #00000088, 0 18px 60px #0008;
+}
+
+.felt .center {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.board { display: flex; gap: 8px; }
+.pot {
+  padding: 5px 16px;
+  border-radius: 20px;
+  background: #0006;
+  border: 1px solid #ffffff14;
+  color: #cbb99f;
+}
+.pot b { color: #f0d68a; font-size: 17px; margin-left: 5px; }
+.pot .sidepots { display: flex; gap: 8px; margin-left: 10px; }
+.pot .sidepots em { font-style: normal; font-size: 12px; color: #8a7663; }
+
+/* ---------- 座位 ---------- */
+
+.pseat {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 132px;
+}
+.pseat .hole { display: flex; gap: 3px; min-height: 44px; align-items: flex-end; }
+.pseat.me .hole { min-height: 60px; }
+.pseat .who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 9px;
+  background: #120d09ee;
+  border: 1px solid #33241a;
+}
+.pseat.turn .who {
+  border-color: #c9a227;
+  box-shadow: 0 0 0 3px #c9a2272e;
+}
+.pseat.acted .who { border-color: #6a5220; }
+.pseat.me .who { background: #1a1209ee; border-color: #4a3a1a; }
+.pseat.folded { opacity: .45; }
+.pseat .info { display: flex; flex-direction: column; line-height: 1.25; }
+.pseat .nm { display: flex; align-items: center; gap: 5px; font-size: 13px; }
+.pseat .stk { color: #f0d68a; font-size: 12px; }
+
+.pseat .dealer {
+  position: absolute;
+  top: -6px;
+  right: 6px;
+  width: 21px; height: 21px;
+  border-radius: 50%;
+  background: #e8ddd0;
+  color: #1a120c;
+  font: 700 12px/21px system-ui;
+  text-align: center;
+}
+.pseat .bet {
+  position: absolute;
+  bottom: -22px;
+  padding: 1px 9px;
+  border-radius: 10px;
+  background: #3a2a08;
+  border: 1px solid #6a5220;
+  color: #f0d68a;
+  font-size: 12px;
+}
+.pseat .allin {
+  position: absolute;
+  top: 40px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: #451512;
+  color: #f0a89c;
+  font-size: 11px;
+}
+.pseat .won {
+  position: absolute;
+  top: -24px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: #143d24;
+  border: 1px solid #2b6b42;
+  color: #9ce8b4;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pseat .handlabel {
+  position: absolute;
+  bottom: -40px;
+  white-space: nowrap;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: #0009;
+  color: #cbb99f;
+  font-size: 12px;
+}
+
+/* ---------- 扑克牌 ---------- */
+
+.pcard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: #f2ece1;
+  color: #16130f;
+  border: 1px solid #00000030;
+  box-shadow: 0 2px 5px #0006;
+  font-weight: 600;
+  line-height: 1;
+}
+.pcard.sm { width: 30px; height: 42px; font-size: 13px; }
+.pcard.md { width: 40px; height: 56px; font-size: 17px; }
+.pcard.lg { width: 52px; height: 74px; font-size: 21px; }
+.pcard .s { font-size: .82em; margin-top: 2px; }
+.pcard.red { color: #b3261e; }
+.pcard.dim { opacity: .4; }
+.pcard.hi { box-shadow: 0 0 0 2px #c9a227, 0 2px 6px #0006; }
+/* 牌背：斜纹，不用图片 */
+.pcard.back {
+  background:
+    repeating-linear-gradient(45deg, #6a2a24 0 5px, #55201b 5px 10px);
+  border-color: #00000050;
+}
+/* 公共牌还没发出来的空位 */
+.pcard.slot {
+  background: #ffffff08;
+  border: 1px dashed #ffffff1c;
+  box-shadow: none;
+}
+
+/* ---------- 牌局日志 ---------- */
+
+.poker-log {
+  grid-area: log;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border-left: 1px solid #2a1d14;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.lrow.action { color: #b9a894; }
+.lrow.street {
+  margin-top: 6px;
+  color: #c9a227;
+  letter-spacing: .1em;
+  font-size: 12px;
+}
+.lrow.result { color: #9ce8b4; }
+.lrow.system { color: #7d6a58; font-size: 12px; margin-top: 6px; }
+
+/* ---------- 操作区 ---------- */
+
+.poker footer { grid-area: foot; border-top: 1px solid #2a1d14; background: #100b08; }
+.pbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 22px;
+  min-height: 62px;
+}
+.pbar.idle { color: #6a5a4a; justify-content: center; }
+.pbar-left, .pbar-right { display: flex; align-items: center; gap: 10px; }
+.pbar-right { margin-left: auto; }
+.pbar button {
+  padding: 9px 20px;
+  border-radius: 7px;
+  border: 1px solid #4a3728;
+  background: #1a120c;
+  color: #e8ddd0;
+  font: 500 14px/1 inherit;
+  cursor: pointer;
+}
+.pbar button:hover:not(:disabled) { border-color: #6a4f38; }
+.pbar button:disabled { opacity: .35; cursor: not-allowed; }
+.pbar button b { margin-left: 5px; color: #f0d68a; }
+.pbar button em {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #451512;
+  color: #f0a89c;
+  font-style: normal;
+  font-size: 11px;
+}
+.pbar button.fold { background: #2a1412; border-color: #5a2a22; color: #e0a49c; }
+.pbar button.check, .pbar button.call { background: #143d24; border-color: #2b6b42; color: #9ce8b4; }
+.pbar button.raise { background: #3a2a08; border-color: #6a5220; color: #f0d68a; }
+.pbar .quick { display: flex; gap: 5px; }
+.pbar .quick button { padding: 6px 11px; font-size: 12px; }
+.pbar input[type='range'] { width: 190px; accent-color: #c9a227; }
