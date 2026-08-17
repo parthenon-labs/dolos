@@ -12,14 +12,20 @@ import { HandRankings, HowToPlay } from './HandRankings'
 import { PlayingCard } from './PlayingCard'
 import { PokerActionBar } from './PokerActionBar'
 
-/** 空位的补位 AI。名字和颜色和大厅里那批同一个风格，看起来是同一个世界的人 */
+/**
+ * 空位的补位 AI。
+ *
+ * 名字取自 UTS 周边的地名和人 —— Ultimo / Broadway / Haymarket 是校区所在，
+ * Dysart 是 UTS Tower 的建筑师，Gehry 是 Building 8 的设计者。
+ * 一桌陌生人如果只叫 P0…P5，坐下来是没有"这是个地方"的感觉的。
+ */
 const FILLERS = [
-  { name: 'Pell', color: '#9a6b3f' },
-  { name: 'Corvo', color: '#4a6a7a' },
-  { name: 'Juno', color: '#7a4a5f' },
-  { name: 'Bask', color: '#5f7a4a' },
-  { name: 'Mott', color: '#8c5a5a' },
-  { name: 'Rilla', color: '#6d6a94' },
+  { name: 'Ultimo', color: '#9a6b3f' },
+  { name: 'Broadway', color: '#4a6a7a' },
+  { name: 'Haymarket', color: '#7a4a5f' },
+  { name: 'Dysart', color: '#5f7a4a' },
+  { name: 'Gehry', color: '#8c5a5a' },
+  { name: 'Alumni', color: '#6d6a94' },
 ]
 
 /**

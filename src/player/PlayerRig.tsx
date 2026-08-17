@@ -98,6 +98,22 @@ export function PlayerRig() {
   const groundY = useRef(0)
   /** 平滑后的标高，上下楼梯时不至于一格一格顿 */
   const smoothY = useRef(0)
+
+  // 开发期传送。验证场景里某个角落长什么样时，走过去要十几秒，
+  // 而且走的过程中很容易忘了自己在验什么。只在 DEV 挂上
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    const d = (w.__dolos ?? (w.__dolos = {})) as Record<string, unknown>
+    d.tp = (x: number, z: number, lookYaw?: number) => {
+      pos.current.set(x, z)
+      if (lookYaw !== undefined) {
+        yaw.current = lookYaw
+        targetYaw.current = lookYaw
+      }
+      return `传送到 ${x}, ${z}`
+    }
+  }, [])
   const level = useRef<0 | 1>(0)
 
   const yaw = useRef(0)
