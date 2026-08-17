@@ -116,7 +116,9 @@ export function startSession(opts: SessionOptions): () => void {
         if (d) st.push(d.text, d.kind)
         if (e.t === 'acted') st.setLastActor(e.seat)
         if (e.t === 'showdown') {
-          st.setShowdown(e.revealed.map((r) => ({ seat: r.seat, label: r.label })))
+          st.setShowdown(
+            e.revealed.map((r) => ({ seat: r.seat, label: r.label, best: r.best })),
+          )
         }
         if (e.t === 'awarded') {
           st.setAwarded(e.rows.filter((r) => r.won > 0).map((r) => ({ seat: r.seat, won: r.won })))

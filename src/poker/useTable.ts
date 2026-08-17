@@ -23,7 +23,7 @@ type TableState = {
   /** 刚刚行动过的座位，用来做高亮闪烁 */
   lastActor: Seat | null
   /** 摊牌时每个座位的牌型说明 */
-  showdown: { seat: Seat; label: string }[]
+  showdown: { seat: Seat; label: string; best: number[] }[]
   /** 本手牌的分配结果，用来飘筹码 */
   awarded: { seat: Seat; won: number }[]
   handNo: number
@@ -32,7 +32,7 @@ type TableState = {
   setPending: (p: TableState['pending']) => void
   push: (text: string, kind?: LogRow['kind']) => void
   setLastActor: (s: Seat | null) => void
-  setShowdown: (r: { seat: Seat; label: string }[]) => void
+  setShowdown: (r: { seat: Seat; label: string; best: number[] }[]) => void
   setAwarded: (r: { seat: Seat; won: number }[]) => void
   newHand: (n: number) => void
   reset: () => void

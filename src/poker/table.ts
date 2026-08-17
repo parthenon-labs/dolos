@@ -110,6 +110,7 @@ export async function runHand(
       seat: r.seat,
       cards: seatOf(s, r.seat).cards.slice(),
       label: r.hand!.label,
+      best: r.hand!.best.slice(),
     }))
   if (revealed.length > 0) emit({ t: 'showdown', revealed })
   emit({ t: 'awarded', rows: s.results })

@@ -667,10 +667,14 @@ footer {
 .action-bar.assassin { background: #150c0a; }
 
 /* =========================================================
-   德州扑克桌（全屏，盖在 3D 之上）
+   德州扑克桌
 
-   配色沿用大厅的暖木和暗琥珀，桌面用深绿绒 —— 玩家是从那个酒馆
-   走进来的，换一套冷色调会像切到了另一个产品。
+   art direction 只有一条原则：**接回大厅**。
+   玩家刚从一个昏暗、暖光、有木头和烛火的 3D 酒馆走进来，
+   这里必须看起来是同一个地方的一张桌子，而不是另一个网页。
+
+   所以：暖琥珀 / 暗木 / 头顶一盏吊灯的光锥 / 重暗角，
+   并且让背后的 3D 场景透出来一点。
    ========================================================= */
 
 .poker {
@@ -679,68 +683,140 @@ footer {
   z-index: 40;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  grid-template-columns: 1fr 260px;
-  grid-template-areas: 'top top' 'felt log' 'foot foot';
-  background: radial-gradient(120% 90% at 50% 0%, #17110c 0%, #0c0806 60%, #060404 100%);
-  color: #e8ddd0;
-  font: 14px/1.55 system-ui, -apple-system, 'PingFang SC', sans-serif;
+  color: #e9dcc9;
+  font: 14px/1.5 'Iowan Old Style', 'Songti SC', Georgia, 'PingFang SC', serif;
+  /* 3D 酒馆透过来当底：暗、暖、糊。桌子于是像"摆在那儿"而不是贴在上面 */
+  /* 背后的 3D 酒馆真的透出来 —— 桌子于是"摆在那儿"，而不是另开一页 */
+  background:
+    radial-gradient(130% 80% at 50% -10%, #3a241366 0%, #180f0899 44%, #060403cc 100%);
+  backdrop-filter: blur(26px) saturate(1.4) brightness(0.85);
+  -webkit-backdrop-filter: blur(26px) saturate(1.4) brightness(0.85);
 }
 
+/*
+  胶片颗粒。3D 那边的后处理里有一层（强度 0.06），这里不加的话
+  两个画面的"材质"对不上 —— 一边有颗粒一边干净，切换时会觉得进了另一个软件。
+*/
+.poker::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: .16;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- 顶栏 ---------- */
+
 .poker-top {
-  grid-area: top;
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 11px 20px;
-  border-bottom: 1px solid #2a1d14;
-  background: #100b08;
+  gap: 18px;
+  padding: 10px 20px;
+  background: linear-gradient(#160f0a, #120c08);
+  border-bottom: 1px solid #34241a;
+  box-shadow: 0 6px 22px #0007;
 }
-.poker-top .brand { font: 600 13px/1 system-ui; letter-spacing: .32em; color: #c9a227; }
-.poker-top .hand-no { color: #b9a894; }
-.poker-top .blinds { color: #8a7663; font-size: 13px; }
+.poker-top .brand {
+  font: 600 13px/1 system-ui;
+  letter-spacing: .34em;
+  color: #d4a72c;
+}
+.poker-top .meta { display: flex; gap: 12px; align-items: baseline; }
+.poker-top .meta .dim { color: #8a7159; font-size: 13px; }
+.poker-top .tools { display: flex; gap: 8px; margin-left: 10px; }
 .poker-top .playmoney {
   margin-left: auto;
   padding: 3px 10px;
   border: 1px solid #3a2a1e;
   border-radius: 5px;
-  color: #7d6a58;
-  font-size: 12px;
+  color: #7d6752;
+  font: 12px/1.4 system-ui;
+}
+.ghost-btn {
+  padding: 6px 13px;
+  border: 1px solid #45311f;
+  border-radius: 6px;
+  background: #1b120b;
+  color: #cbb08a;
+  font: 500 13px/1 system-ui;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.ghost-btn:hover { border-color: #7a5a2e; color: #f2dfae; background: #241708; }
+
+/* ---------- 桌面 ---------- */
+
+.felt-wrap {
+  display: grid;
+  grid-template-columns: 1fr 250px;
+  min-height: 0;
 }
 
-/* ---------- 牌桌 ---------- */
-
 .felt {
-  grid-area: felt;
   position: relative;
-  margin: 22px;
-  border-radius: 50% / 34%;
-  background: radial-gradient(70% 70% at 50% 42%, #1c4a34 0%, #0f2c20 62%, #0a1f16 100%);
-  background-color: #0f2c20;
-  border: 10px solid #2a1a12;
-  box-shadow: inset 0 0 90px #00000088, 0 18px 60px #0008;
+  margin: 20px 14px 12px 20px;
+  border-radius: 46% / 40%;
+  /* 绒面：中心被吊灯打亮，四周迅速沉下去 */
+  /* 绒面。绿色刻意压得很暗且偏黄 —— 高饱和的赌场绿和这间酒馆不是一个世界 */
+  background:
+    radial-gradient(52% 46% at 50% 38%, #29513c 0%, #1b3a2b 44%, #12271d 72%, #0a1811 100%);
+  /* 木框：外深内浅的双层，加一圈高光当漆面 */
+  border: 16px solid #33200f;
+  box-shadow:
+    inset 0 0 0 2px #59391b,
+    inset 0 0 90px #000000b3,
+    inset 0 10px 40px #00000080,
+    0 0 0 2px #1a1009,
+    0 26px 80px #000c;
+}
+
+/* 木框上的一道弧形高光，让它有厚度而不是一条描边 */
+.felt::before {
+  content: '';
+  position: absolute;
+  inset: -16px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(160deg, #a8794033 0%, transparent 34%, transparent 66%, #00000055 100%);
+}
+
+/* 吊灯的光锥。纯装饰，但它是"这是间酒馆"的主要信号 */
+.felt .spotlight {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(46% 42% at 50% 32%, #ffd39433 0%, #ffb35a18 42%, transparent 70%);
+  mix-blend-mode: screen;
 }
 
 .felt .center {
   position: absolute;
   left: 50%;
-  top: 44%;
+  top: 40%;
   transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
-.board { display: flex; gap: 8px; }
-.pot {
-  padding: 5px 16px;
-  border-radius: 20px;
-  background: #0006;
+.board { display: flex; gap: 9px; align-items: flex-end; }
+
+.potbox { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.pot-num {
+  padding: 3px 15px;
+  border-radius: 18px;
+  background: #00000055;
   border: 1px solid #ffffff14;
-  color: #cbb99f;
+  color: #c9b190;
+  font: 13px/1.5 system-ui;
 }
-.pot b { color: #f0d68a; font-size: 17px; margin-left: 5px; }
-.pot .sidepots { display: flex; gap: 8px; margin-left: 10px; }
-.pot .sidepots em { font-style: normal; font-size: 12px; color: #8a7663; }
+.pot-num b { color: #f2cf7d; font-size: 17px; margin-left: 6px; }
+.sidepots { display: flex; gap: 9px; color: #8a7159; font: 11px/1 system-ui; }
 
 /* ---------- 座位 ---------- */
 
@@ -750,178 +826,416 @@ footer {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  width: 132px;
+  gap: 4px;
+  width: 138px;
 }
-.pseat .hole { display: flex; gap: 3px; min-height: 44px; align-items: flex-end; }
-.pseat.me .hole { min-height: 60px; }
-.pseat .who {
+.pseat.folded { opacity: .4; filter: grayscale(.5); }
+
+.pseat .hole { display: flex; gap: 3px; min-height: 42px; align-items: flex-end; }
+
+.pseat .plate {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 10px;
-  border-radius: 9px;
-  background: #120d09ee;
-  border: 1px solid #33241a;
+  padding: 5px 11px 5px 8px;
+  border-radius: 11px;
+  background: linear-gradient(#1d140deb, #140e09eb);
+  border: 1px solid #3d2a1a;
+  box-shadow: 0 4px 14px #0007;
 }
-.pseat.turn .who {
-  border-color: #c9a227;
-  box-shadow: 0 0 0 3px #c9a2272e;
+.pseat.turn .plate {
+  border-color: #d4a72c;
+  box-shadow: 0 0 0 3px #d4a72c26, 0 4px 18px #0008;
 }
-.pseat.acted .who { border-color: #6a5220; }
-.pseat.me .who { background: #1a1209ee; border-color: #4a3a1a; }
-.pseat.folded { opacity: .45; }
-.pseat .info { display: flex; flex-direction: column; line-height: 1.25; }
-.pseat .nm { display: flex; align-items: center; gap: 5px; font-size: 13px; }
-.pseat .stk { color: #f0d68a; font-size: 12px; }
+.pseat.acted .plate { border-color: #6d4d24; }
+.pseat.winner .plate { border-color: #4fae72; box-shadow: 0 0 0 3px #4fae7229; }
+.pseat .info { display: flex; flex-direction: column; line-height: 1.28; }
+.pseat .nm { display: flex; align-items: center; gap: 5px; font: 500 13px/1.3 system-ui; }
+.pseat .stk { color: #f2cf7d; font: 12px/1.3 system-ui; }
+
+em.ai {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #15332c;
+  color: #62cfae;
+  font: 500 10px/15px system-ui;
+  font-style: normal;
+}
 
 .pseat .dealer {
   position: absolute;
-  top: -6px;
-  right: 6px;
+  top: -8px; left: -8px;
   width: 21px; height: 21px;
   border-radius: 50%;
-  background: #e8ddd0;
-  color: #1a120c;
+  background: linear-gradient(#f4ece0, #cdbfa9);
+  color: #201509;
   font: 700 12px/21px system-ui;
   text-align: center;
+  box-shadow: 0 2px 5px #0009;
 }
-.pseat .bet {
-  position: absolute;
-  bottom: -22px;
-  padding: 1px 9px;
-  border-radius: 10px;
-  background: #3a2a08;
-  border: 1px solid #6a5220;
-  color: #f0d68a;
-  font-size: 12px;
-}
+.pseat .bet { margin-top: 3px; }
+.pseat.me .bet { order: -1; margin-bottom: 4px; }
 .pseat .allin {
-  position: absolute;
-  top: 40px;
   padding: 1px 8px;
   border-radius: 4px;
-  background: #451512;
+  background: #4a1613;
   color: #f0a89c;
-  font-size: 11px;
+  font: 11px/1.5 system-ui;
 }
 .pseat .won {
   position: absolute;
-  top: -24px;
-  padding: 2px 10px;
-  border-radius: 10px;
-  background: #143d24;
-  border: 1px solid #2b6b42;
-  color: #9ce8b4;
-  font-size: 13px;
-  font-weight: 600;
+  top: -26px;
+  padding: 2px 11px;
+  border-radius: 11px;
+  background: #133d26;
+  border: 1px solid #35845a;
+  color: #9fe9bb;
+  font: 600 13px/1.5 system-ui;
 }
+.pseat .won.big { top: -34px; font-size: 16px; padding: 3px 15px; }
 .pseat .handlabel {
-  position: absolute;
-  bottom: -40px;
   white-space: nowrap;
-  padding: 1px 8px;
+  padding: 1px 9px;
   border-radius: 4px;
-  background: #0009;
-  color: #cbb99f;
-  font-size: 12px;
+  background: #000000aa;
+  color: #cbb190;
+  font: 12px/1.6 system-ui;
+}
+
+/* 自己：固定在桌子下沿，牌更大 */
+.pseat.me {
+  left: 50%;
+  top: auto;
+  bottom: -26px;
+  transform: translateX(-50%);
+  width: auto;
+  gap: 5px;
+}
+.pseat.me .hole { gap: 7px; min-height: 84px; }
+.pseat.me .myhand {
+  padding: 2px 12px;
+  border-radius: 5px;
+  background: #2a1c0daa;
+  border: 1px solid #4e3818;
+  color: #f2cf7d;
+  font: 500 13px/1.6 system-ui;
 }
 
 /* ---------- 扑克牌 ---------- */
 
 .pcard {
   position: relative;
+  border-radius: 5px;
+  background: linear-gradient(#faf6ee, #eee6d7);
+  color: #1a1510;
+  border: 1px solid #00000038;
+  box-shadow: 0 3px 8px #0007, inset 0 1px 0 #fff;
+  font-family: 'Iowan Old Style', Georgia, serif;
+  flex: none;
+}
+.pcard.xs { width: 27px; height: 38px; }
+.pcard.sm { width: 34px; height: 48px; }
+.pcard.md { width: 42px; height: 59px; }
+.pcard.lg { width: 54px; height: 76px; }
+.pcard.xl { width: 68px; height: 96px; }
+
+/* 角标才是真牌的信息所在：捏成扇形时只看得见角 */
+.pcard .corner {
+  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  border-radius: 5px;
-  background: #f2ece1;
-  color: #16130f;
-  border: 1px solid #00000030;
-  box-shadow: 0 2px 5px #0006;
-  font-weight: 600;
-  line-height: 1;
+  line-height: .95;
+  font-weight: 700;
 }
-.pcard.sm { width: 30px; height: 42px; font-size: 13px; }
-.pcard.md { width: 40px; height: 56px; font-size: 17px; }
-.pcard.lg { width: 52px; height: 74px; font-size: 21px; }
-.pcard .s { font-size: .82em; margin-top: 2px; }
-.pcard.red { color: #b3261e; }
-.pcard.dim { opacity: .4; }
-.pcard.hi { box-shadow: 0 0 0 2px #c9a227, 0 2px 6px #0006; }
-/* 牌背：斜纹，不用图片 */
+.pcard .corner.tl { top: 4%; left: 7%; }
+.pcard .corner.br { bottom: 4%; right: 7%; transform: rotate(180deg); }
+.pcard .corner i { font-style: normal; }
+.pcard .pip {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: .9;
+}
+.pcard.xs .corner { font-size: 9px; }   .pcard.xs .pip { font-size: 15px; }
+.pcard.sm .corner { font-size: 11px; }  .pcard.sm .pip { font-size: 19px; }
+.pcard.md .corner { font-size: 13px; }  .pcard.md .pip { font-size: 24px; }
+.pcard.lg .corner { font-size: 16px; }  .pcard.lg .pip { font-size: 31px; }
+.pcard.xl .corner { font-size: 20px; }  .pcard.xl .pip { font-size: 40px; }
+
+.pcard.red { color: #ad2b21; }
+.pcard.dim { opacity: .42; }
+/* 摊牌时高亮"就是这五张赢的" */
+.pcard.hi {
+  box-shadow: 0 0 0 2px #d4a72c, 0 0 16px #d4a72c66, 0 3px 8px #0007;
+  transform: translateY(-4px) rotate(0deg);
+  z-index: 2;
+}
 .pcard.back {
   background:
-    repeating-linear-gradient(45deg, #6a2a24 0 5px, #55201b 5px 10px);
-  border-color: #00000050;
+    repeating-linear-gradient(45deg, #6d2b23 0 6px, #551f1a 6px 12px);
+  border-color: #00000055;
+  box-shadow: 0 3px 8px #0007, inset 0 0 0 3px #8d453a;
 }
-/* 公共牌还没发出来的空位 */
 .pcard.slot {
-  background: #ffffff08;
+  background: #ffffff06;
   border: 1px dashed #ffffff1c;
   box-shadow: none;
 }
 
+/* ---------- 筹码 ---------- */
+
+.chips { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.chip-row { display: flex; align-items: flex-end; gap: 4px; }
+.chip-stack { position: relative; }
+.chip {
+  position: absolute;
+  left: 0;
+  border-radius: 50%;
+  border: 1px solid;
+  box-shadow: 0 1px 2px #0009, inset 0 -2px 3px #0006, inset 0 2px 2px #ffffff26;
+  /* 边缘的白点，一眼认出是筹码而不是圆点 */
+  background-image:
+    repeating-conic-gradient(from 0deg, #ffffff00 0deg 22deg, #ffffff42 22deg 30deg);
+  background-blend-mode: overlay;
+}
+.chip.solo { position: relative; display: inline-block; }
+.chip-count {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #e9dcc9;
+  font: 600 10px/1 system-ui;
+  text-shadow: 0 1px 3px #000;
+}
+.chip-amount { color: #f2cf7d; font: 600 12px/1 system-ui; }
+
 /* ---------- 牌局日志 ---------- */
 
 .poker-log {
-  grid-area: log;
   overflow-y: auto;
-  padding: 14px 16px;
-  border-left: 1px solid #2a1d14;
-  font-size: 13px;
+  padding: 16px 16px 16px 12px;
+  border-left: 1px solid #2c1e14;
   display: flex;
   flex-direction: column;
   gap: 3px;
+  font: 13px/1.6 system-ui;
 }
-.lrow.action { color: #b9a894; }
+.lrow.action { color: #b0997c; }
 .lrow.street {
-  margin-top: 6px;
-  color: #c9a227;
-  letter-spacing: .1em;
+  margin-top: 8px;
+  color: #d4a72c;
+  letter-spacing: .14em;
   font-size: 12px;
 }
-.lrow.result { color: #9ce8b4; }
-.lrow.system { color: #7d6a58; font-size: 12px; margin-top: 6px; }
+.lrow.result { color: #9fe9bb; }
+.lrow.system { color: #7d6752; font-size: 12px; margin-top: 8px; }
 
 /* ---------- 操作区 ---------- */
 
-.poker footer { grid-area: foot; border-top: 1px solid #2a1d14; background: #100b08; }
-.pbar {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 13px 22px;
-  min-height: 62px;
+.poker footer {
+  border-top: 1px solid #34241a;
+  background: linear-gradient(#150e09, #100a06);
+  box-shadow: 0 -8px 26px #0007;
 }
-.pbar.idle { color: #6a5a4a; justify-content: center; }
-.pbar-left, .pbar-right { display: flex; align-items: center; gap: 10px; }
-.pbar-right { margin-left: auto; }
-.pbar button {
-  padding: 9px 20px;
-  border-radius: 7px;
-  border: 1px solid #4a3728;
-  background: #1a120c;
-  color: #e8ddd0;
-  font: 500 14px/1 inherit;
+.pbar { padding: 10px 20px 13px; }
+.pbar.idle {
+  min-height: 92px;
+  display: grid;
+  place-items: center;
+  color: #6d5a45;
+  font: 14px/1 system-ui;
+}
+.pbar.idle .dots::after {
+  content: '…';
+  animation: dots 1.4s steps(4, end) infinite;
+}
+@keyframes dots { 0% { opacity: .2 } 50% { opacity: 1 } 100% { opacity: .2 } }
+
+/* 局面提示：新手最需要的那句话 */
+.coach {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 13px;
+  margin-bottom: 9px;
+  border-radius: 8px;
+  background: #1c1409;
+  border: 1px solid #3c2a15;
+  border-left: 3px solid #d4a72c;
+}
+.coach-main { display: flex; align-items: baseline; gap: 11px; }
+.coach-main .street {
+  padding: 1px 9px;
+  border-radius: 4px;
+  background: #3a2a08;
+  color: #f2cf7d;
+  font: 600 12px/1.6 system-ui;
+}
+.coach-main .hand { color: #f0e3cd; font: 500 15px/1.4 system-ui; }
+.coach-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: #a08b70;
+  font: 13px/1.5 system-ui;
+}
+.coach-sub .odds { color: #86b6d6; }
+.coach-sub .warn { color: #f0a89c; }
+
+.pbar .buttons { display: flex; align-items: stretch; gap: 10px; }
+.pbar .buttons > button,
+.pbar .raise-box > .raise-row > button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 16px;
+  min-width: 132px;
+  border-radius: 8px;
+  border: 1px solid #45311f;
+  background: #1d140c;
+  color: #e9dcc9;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .13s, background .13s, transform .08s;
+}
+.pbar button:hover:not(:disabled) { border-color: #7a5a2e; background: #261a0e; }
+.pbar button:active:not(:disabled) { transform: translateY(1px); }
+.pbar button:disabled { opacity: .32; cursor: not-allowed; }
+.pbar .lab { display: flex; align-items: center; gap: 6px; font: 600 15px/1.3 system-ui; }
+/* 按钮的解释文案。老手会自动忽略它，新手不会卡住 —— 这个不对称是它值得占空间的理由 */
+.pbar .why { color: #8d7862; font: 12px/1.35 system-ui; }
+.pbar kbd {
+  padding: 0 5px;
+  border-radius: 3px;
+  border: 1px solid #55402a;
+  background: #0f0a06;
+  color: #9c8467;
+  font: 500 10px/16px system-ui;
+}
+.pbar em {
+  padding: 0 6px;
+  border-radius: 3px;
+  background: #4a1613;
+  color: #f0a89c;
+  font: 500 11px/16px system-ui;
+  font-style: normal;
+}
+.pbar button.fold  { background: #241110; border-color: #5c2b22; }
+.pbar button.fold .lab  { color: #e5a89e; }
+.pbar button.check,
+.pbar button.call  { background: #12331f; border-color: #2f6b45; }
+.pbar button.check .lab,
+.pbar button.call .lab { color: #9fe9bb; }
+.pbar button.raise { background: #3a2a08; border-color: #7a5c1e; }
+.pbar button.raise .lab { color: #f2cf7d; }
+
+.raise-box { display: flex; flex-direction: column; gap: 6px; margin-left: auto; }
+.raise-box.disabled {
+  justify-content: center;
+  padding: 0 14px;
+  color: #6d5a45;
+  font: 13px/1.5 system-ui;
+}
+.raise-box .quick { display: flex; gap: 5px; }
+.raise-box .quick button {
+  padding: 4px 11px;
+  border-radius: 5px;
+  border: 1px solid #3f2c1b;
+  background: #17100a;
+  color: #a89076;
+  font: 12px/1.5 system-ui;
   cursor: pointer;
 }
-.pbar button:hover:not(:disabled) { border-color: #6a4f38; }
-.pbar button:disabled { opacity: .35; cursor: not-allowed; }
-.pbar button b { margin-left: 5px; color: #f0d68a; }
-.pbar button em {
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: #451512;
-  color: #f0a89c;
-  font-style: normal;
-  font-size: 11px;
+.raise-box .quick button:hover { border-color: #7a5a2e; color: #f2dfae; }
+.raise-box .raise-row { display: flex; align-items: center; gap: 12px; }
+.raise-box input[type='range'] { width: 190px; accent-color: #d4a72c; }
+
+/* ---------- 说明浮层（牌型 / 怎么玩） ---------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 30px;
+  background: #05030299;
+  backdrop-filter: blur(4px);
 }
-.pbar button.fold { background: #2a1412; border-color: #5a2a22; color: #e0a49c; }
-.pbar button.check, .pbar button.call { background: #143d24; border-color: #2b6b42; color: #9ce8b4; }
-.pbar button.raise { background: #3a2a08; border-color: #6a5220; color: #f0d68a; }
-.pbar .quick { display: flex; gap: 5px; }
-.pbar .quick button { padding: 6px 11px; font-size: 12px; }
-.pbar input[type='range'] { width: 190px; accent-color: #c9a227; }
+.sheet {
+  width: min(720px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 22px 26px 26px;
+  border-radius: 14px;
+  background: linear-gradient(#1b120c, #140d08);
+  border: 1px solid #4a3520;
+  box-shadow: 0 30px 90px #000b;
+}
+.sheet header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #33241a;
+}
+.sheet h2 { margin: 0; font: 600 20px/1 system-ui; color: #f2dfae; }
+.sheet .sub { color: #8a7159; font: 13px/1 system-ui; }
+.sheet header .ghost-btn { margin-left: auto; }
+
+.rank-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.rank-list li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #ffffff05;
+}
+.rank-list .no {
+  width: 20px;
+  color: #6d5a45;
+  font: 600 13px/1 system-ui;
+  text-align: center;
+}
+.rank-list .cards { display: flex; gap: 3px; }
+.rank-list .meta { display: flex; flex-direction: column; }
+.rank-list .meta b { color: #f0e3cd; font: 600 15px/1.4 system-ui; }
+.rank-list .meta span { color: #8d7862; font: 12px/1.4 system-ui; }
+
+.flow { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+.flow li {
+  position: relative;
+  padding: 8px 0 8px 40px;
+  border-left: 1px solid #33241a;
+  margin-left: 12px;
+}
+.flow li::before {
+  counter-increment: s;
+  content: counter(s);
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  width: 23px; height: 23px;
+  border-radius: 50%;
+  background: #2a1c0d;
+  border: 1px solid #5a4020;
+  color: #d4a72c;
+  font: 600 12px/22px system-ui;
+  text-align: center;
+}
+.flow li b { display: block; color: #f0e3cd; font: 600 15px/1.5 system-ui; }
+.flow li span { color: #9c8467; font: 13px/1.5 system-ui; }
+
+.sheet footer {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #33241a;
+}
+.sheet footer p { margin: 0 0 8px; color: #9c8467; font: 13px/1.7 system-ui; }
+.sheet footer b { color: #d4a72c; }

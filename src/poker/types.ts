@@ -98,7 +98,11 @@ export type PokerEvent =
   | { t: 'acted'; seat: Seat; action: Action; committed: number; stack: number }
   | { t: 'street'; street: Street; board: Card[] }
   | { t: 'pots'; pots: Pot[] }
-  | { t: 'showdown'; revealed: { seat: Seat; cards: Card[]; label: string }[] }
+  /** best = 构成这手牌的五张，界面靠它高亮"是哪五张赢的" */
+  | {
+      t: 'showdown'
+      revealed: { seat: Seat; cards: Card[]; label: string; best: Card[] }[]
+    }
   | { t: 'awarded'; rows: HandResultRow[] }
   | { t: 'hand_ended'; handNo: number }
 

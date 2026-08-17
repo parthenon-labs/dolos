@@ -1,24 +1,17 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGameStore } from '../../state/useGameStore'
 import { usePlayerStore } from '../../state/usePlayerStore'
 import { tableById } from '../../scene/hallLayout'
 import { startSession } from '../../poker/session'
 import { useTable } from '../../poker/useTable'
+import { describe, evaluate } from '../../poker/evaluate'
 import type { Seat } from '../../poker/types'
 import { Avatar } from '../match/Avatar'
+import { Chips } from './Chips'
+import { HandRankings, HowToPlay } from './HandRankings'
 import { PlayingCard } from './PlayingCard'
 import { PokerActionBar } from './PokerActionBar'
 
-/**
- * 全屏德州扑克桌。坐下之后盖住 3D 场景。
- *
- * 布局是**你在下方正中，其余人沿椭圆铺开** —— 扑克游戏几十年的惯例，
- * 玩家不需要学。这也顺手绕开了第一人称的视野问题：
- * 2D 里"所有人都看得见"是免费的。
- *
- * 3D 大厅没有废掉：它是进门那一下的氛围和落座，
- * 以及将来摊牌时切回桌上的那一下。
- */
 /** 空位的补位 AI。名字和颜色和大厅里那批同一个风格，看起来是同一个世界的人 */
 const FILLERS = [
   { name: 'Pell', color: '#9a6b3f' },
@@ -29,6 +22,19 @@ const FILLERS = [
   { name: 'Rilla', color: '#6d6a94' },
 ]
 
+/**
+ * 全屏德州扑克桌。
+ *
+ * 这一版重做的核心不是"配色好看点"，而是**接回大厅的视觉语言**：
+ * 玩家刚从一个昏暗、暖光、有氛围的 3D 酒馆走进来，
+ * 落地却是一块扁平的绿椭圆加系统字体 —— 这个断裂比任何单项审美问题都伤。
+ *
+ * 所以：暖琥珀 + 暗木 + 头顶一盏吊灯的光锥 + 暗角，和大厅同一套；
+ * 3D 场景继续在背后渲染并透出来，桌子像是"摆在那个酒馆里"而不是另一个页面。
+ *
+ * 布局仍然是你在下方正中、其余人沿上方的弧铺开 —— 扑克游戏几十年的惯例，
+ * 玩家不需要学，也顺手绕开了第一人称的视野问题。
+ */
 export function PokerTable() {
   const seatedAt = usePlayerStore((s) => s.seatedAt)
   const mode = usePlayerStore((s) => s.mode)
@@ -43,6 +49,8 @@ export function PokerTable() {
   const awarded = useTable((s) => s.awarded)
   const handNo = useTable((s) => s.handNo)
 
+  const [sheet, setSheet] = useState<null | 'ranks' | 'how'>(null)
+
   const table = seatedAt ? tableById(seatedAt.tableId) : undefined
 
   const seats = useMemo(() => {
@@ -52,9 +60,6 @@ export function PokerTable() {
       if (i === seatedAt.seat) {
         return { seat: i, name: '你', color: occ[i]?.color ?? '#c9a227', isAI: false, stack: 200 }
       }
-      // 空位由 AI 补上 —— 这本来就是这个产品的核心，
-      // 所以它必须有名字和颜色。露出"座位 3"这种占位符
-      // 等于告诉玩家"这里还没做完"
       const filler = FILLERS[i % FILLERS.length]
       return {
         seat: i,
@@ -84,129 +89,205 @@ export function PokerTable() {
     (view?.pots.reduce((a, p) => a + p.amount, 0) ?? 0) +
     (view?.players.reduce((a, p) => a + p.committed, 0) ?? 0)
 
-  // 座位在椭圆上的位置。自己永远在正下方（角度 90°），其余顺时针铺开
+  // 其他人沿上方的弧铺开，自己固定在正下方。
+  // 不用整圈均分：正下方要留给自己的大牌和筹码，别人塞进去会互相压
   const spot = (seat: Seat) => {
     const rel = (seat - mySeat + n) % n
-    const angle = Math.PI / 2 + (rel / n) * Math.PI * 2
+    if (rel === 0) return null
+    const t = n <= 2 ? 0.5 : (rel - 1) / (n - 2)
+    const angle = Math.PI * (1.04 - t * 1.08)
     return {
-      left: `${50 + Math.cos(angle) * 39}%`,
-      top: `${52 + Math.sin(angle) * 37}%`,
+      left: `${50 + Math.cos(angle) * 40}%`,
+      top: `${46 - Math.sin(angle) * 31}%`,
     }
   }
 
-  const best = new Set(
-    showdown.length > 0 && view
-      ? view.players.flatMap((p) => (p.revealed ? p.revealed : []))
-      : [],
-  )
-  void best
+  // 摊牌时高亮"是哪五张牌赢的"。
+  // 对新手这是最强的一次「啊原来如此」—— 只报牌型名字，他对不上是哪几张
+  const bestSet = new Set<number>(showdown.flatMap((s) => s.best))
+
+  // 你现在成了什么牌。翻牌之后就一直显示，不用等摊牌 ——
+  // 让人时刻知道自己手里是什么，是这个游戏最基本的可用性
+  const myHand =
+    view && view.myCards.length === 2 && view.board.length >= 3
+      ? describe(evaluate([...view.myCards, ...view.board]))
+      : null
 
   return (
     <div className="poker">
       <header className="poker-top">
         <div className="brand">DOLOS</div>
-        <div className="hand-no">第 {handNo} 手</div>
-        <div className="blinds">
-          盲注 {view?.config.smallBlind ?? 1}/{view?.config.bigBlind ?? 2}
+        <div className="meta">
+          <span>第 {handNo} 手</span>
+          <span className="dim">
+            盲注 {view?.config.smallBlind ?? 1}/{view?.config.bigBlind ?? 2}
+          </span>
         </div>
-        {/* 虚拟筹码。这句话必须一直在，不是免责声明而是产品定义 */}
+        <div className="tools">
+          <button className="ghost-btn" onClick={() => setSheet('ranks')}>
+            牌型大小
+          </button>
+          <button className="ghost-btn" onClick={() => setSheet('how')}>
+            怎么玩
+          </button>
+        </div>
         <div className="playmoney">虚拟筹码 · 不可充值提现</div>
-        <button className="ghost-btn" onClick={stand}>
+        <button className="ghost-btn leave" onClick={stand}>
           离席
         </button>
       </header>
 
-      <div className="felt">
-        <div className="center">
-          <div className="board">
-            {Array.from({ length: 5 }, (_, i) => {
-              const c = view?.board[i]
-              return c === undefined ? (
-                <div key={i} className="pcard slot lg" />
-              ) : (
-                <PlayingCard key={i} card={c} size="lg" />
-              )
-            })}
+      <div className="felt-wrap">
+        <div className="felt">
+          <div className="spotlight" />
+
+          <div className="center">
+            <div className="board">
+              {Array.from({ length: 5 }, (_, i) => {
+                const c = view?.board[i]
+                return c === undefined ? (
+                  <div key={i} className="pcard slot lg" />
+                ) : (
+                  <PlayingCard
+                    key={i}
+                    card={c}
+                    size="lg"
+                    highlight={bestSet.has(c)}
+                    tilt={((i * 37) % 5) - 2}
+                  />
+                )
+              })}
+            </div>
+
+            <div className="potbox">
+              <Chips amount={pot} size={19} showAmount={false} />
+              <div className="pot-num">
+                底池 <b>{pot}</b>
+              </div>
+              {view && view.pots.length > 1 && (
+                <div className="sidepots">
+                  {view.pots.map((p, i) => (
+                    <span key={i}>
+                      {i === 0 ? '主池' : `边池 ${i}`} {p.amount}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="pot">
-            底池 <b>{pot}</b>
-            {view && view.pots.length > 1 && (
-              <span className="sidepots">
-                {view.pots.map((p, i) => (
-                  <em key={i}>
-                    {i === 0 ? '主池' : `边池${i}`} {p.amount}
-                  </em>
-                ))}
-              </span>
-            )}
-          </div>
+
+          {seats.map((s) => {
+            const pos = spot(s.seat)
+            if (!pos) return null
+            const p = view?.players.find((x) => x.seat === s.seat)
+            const isTurn = view?.turn === s.seat
+            const won = awarded.find((a) => a.seat === s.seat)
+            const label = showdown.find((x) => x.seat === s.seat)?.label
+            return (
+              <div
+                key={s.seat}
+                className={
+                  'pseat' +
+                  (p?.folded ? ' folded' : '') +
+                  (isTurn ? ' turn' : '') +
+                  (lastActor === s.seat ? ' acted' : '') +
+                  (won ? ' winner' : '')
+                }
+                style={pos}
+              >
+                <div className="hole">
+                  {p?.revealed ? (
+                    p.revealed.map((c, i) => (
+                      <PlayingCard key={i} card={c} size="sm" highlight={bestSet.has(c)} />
+                    ))
+                  ) : p && !p.folded && !p.sittingOut ? (
+                    <>
+                      <PlayingCard faceDown size="sm" tilt={-4} />
+                      <PlayingCard faceDown size="sm" tilt={4} />
+                    </>
+                  ) : null}
+                </div>
+
+                <div className="plate">
+                  {view?.button === s.seat && <span className="dealer">D</span>}
+                  <Avatar color={s.color} size={36} dim={p?.folded} />
+                  <div className="info">
+                    <span className="nm">
+                      {s.name}
+                      {s.isAI && <em className="ai">AI</em>}
+                    </span>
+                    <span className="stk">{p?.stack ?? s.stack}</span>
+                  </div>
+                </div>
+
+                {label && <div className="handlabel">{label}</div>}
+                {won && <div className="won">+{won.won}</div>}
+                {p && p.committed > 0 && (
+                  <div className="bet">
+                    <Chips amount={p.committed} size={14} />
+                  </div>
+                )}
+                {p?.allIn && !p.folded && <div className="allin">全下</div>}
+              </div>
+            )
+          })}
+
+          {(() => {
+            const s = seats[mySeat]
+            if (!s) return null
+            const p = view?.players.find((x) => x.seat === mySeat)
+            const isTurn = view?.turn === mySeat
+            const won = awarded.find((a) => a.seat === mySeat)
+            const label = showdown.find((x) => x.seat === mySeat)?.label
+            return (
+              <div className={'pseat me' + (isTurn ? ' turn' : '') + (won ? ' winner' : '')}>
+                {p && p.committed > 0 && (
+                  <div className="bet">
+                    <Chips amount={p.committed} size={15} />
+                  </div>
+                )}
+                <div className="hole">
+                  {(view?.myCards ?? []).map((c, i) => (
+                    <PlayingCard
+                      key={i}
+                      card={c}
+                      size="xl"
+                      dim={p?.folded}
+                      highlight={bestSet.has(c)}
+                      tilt={i === 0 ? -5 : 5}
+                    />
+                  ))}
+                </div>
+                {(label || myHand) && <div className="myhand">{label ?? myHand}</div>}
+                <div className="plate">
+                  {view?.button === mySeat && <span className="dealer">D</span>}
+                  <Avatar color={s.color} size={38} />
+                  <div className="info">
+                    <span className="nm">你</span>
+                    <span className="stk">{p?.stack ?? s.stack}</span>
+                  </div>
+                </div>
+                {won && <div className="won big">+{won.won}</div>}
+              </div>
+            )
+          })()}
         </div>
 
-        {seats.map((s) => {
-          const p = view?.players.find((x) => x.seat === s.seat)
-          const isTurn = view?.turn === s.seat
-          const won = awarded.find((a) => a.seat === s.seat)
-          const label = showdown.find((x) => x.seat === s.seat)?.label
-          return (
-            <div
-              key={s.seat}
-              className={
-                'pseat' +
-                (s.seat === mySeat ? ' me' : '') +
-                (p?.folded ? ' folded' : '') +
-                (isTurn ? ' turn' : '') +
-                (lastActor === s.seat ? ' acted' : '')
-              }
-              style={spot(s.seat)}
-            >
-              {view?.button === s.seat && <span className="dealer">D</span>}
-
-              <div className="hole">
-                {s.seat === mySeat ? (
-                  (view?.myCards ?? []).map((c, i) => (
-                    <PlayingCard key={i} card={c} size="md" dim={p?.folded} />
-                  ))
-                ) : p?.revealed ? (
-                  p.revealed.map((c, i) => <PlayingCard key={i} card={c} size="sm" />)
-                ) : p && !p.folded && !p.sittingOut ? (
-                  <>
-                    <PlayingCard faceDown size="sm" />
-                    <PlayingCard faceDown size="sm" />
-                  </>
-                ) : null}
-              </div>
-
-              <div className="who">
-                <Avatar color={s.color} size={34} dim={p?.folded} />
-                <div className="info">
-                  <span className="nm">
-                    {s.name}
-                    {s.isAI && <em className="ai">AI</em>}
-                  </span>
-                  <span className="stk">{p?.stack ?? s.stack}</span>
-                </div>
-              </div>
-
-              {label && <div className="handlabel">{label}</div>}
-              {won && <div className="won">+{won.won}</div>}
-              {p && p.committed > 0 && <div className="bet">{p.committed}</div>}
-              {p?.allIn && !p.folded && <div className="allin">全下</div>}
+        <aside className="poker-log" ref={logBox}>
+          {log.map((r) => (
+            <div key={r.id} className={'lrow ' + r.kind}>
+              {r.text}
             </div>
-          )
-        })}
+          ))}
+        </aside>
       </div>
-
-      <aside className="poker-log" ref={logBox}>
-        {log.map((r) => (
-          <div key={r.id} className={'lrow ' + r.kind}>
-            {r.text}
-          </div>
-        ))}
-      </aside>
 
       <footer>
         <PokerActionBar pending={pending} onAct={(a) => pending?.resolve(a)} />
       </footer>
+
+      {sheet === 'ranks' && <HandRankings onClose={() => setSheet(null)} />}
+      {sheet === 'how' && <HowToPlay onClose={() => setSheet(null)} />}
     </div>
   )
 }
