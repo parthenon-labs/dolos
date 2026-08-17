@@ -1,4 +1,5 @@
 import { FLOOR2_Y, HALL, SLAB, STAIRS, stairHeightAt } from '../hallLayout'
+import { GlowEmblem } from './GlowEmblem'
 import { GlowText } from './GlowText'
 
 /**
@@ -58,34 +59,12 @@ export function UtsDressing() {
         rotation={[0, Math.PI / 2, 0]}
       />
 
-      {/* ---- 三面挑台边缘的灯带：站在一楼中庭抬头，围着你一圈 ---- */}
-      <GlowText
-        text="UTS"
-        color={GREEN}
-        width={11}
-        repeat={5}
-        position={[-4.92, FLOOR2_Y - SLAB / 2, -3]}
-        rotation={[0, Math.PI / 2, 0]}
-        opacity={0.8}
-      />
-      <GlowText
-        text="UTS"
-        color={GREEN}
-        width={11}
-        repeat={5}
-        position={[4.92, FLOOR2_Y - SLAB / 2, -3]}
-        rotation={[0, -Math.PI / 2, 0]}
-        opacity={0.8}
-      />
-      <GlowText
-        text="UTS"
-        color={GREEN}
-        width={8}
-        repeat={4}
-        position={[0, FLOOR2_Y - SLAB / 2, -10.52]}
-        rotation={[0, 0, 0]}
-        opacity={0.8}
-      />
+      {/* ---- 三面挑台边缘：一排徽记。
+             原来是 `UTS · UTS · UTS` 的字带，密密麻麻反而像贴纸；
+             徽记有轮廓、间隔开，远看是一串灯，近看认得出图案 ---- */}
+      <EmblemRail axis="x" at={-4.9} from={-14.2} to={3.2} facing={1} />
+      <EmblemRail axis="x" at={4.9} from={-14.2} to={3.2} facing={-1} />
+      <EmblemRail axis="z" at={-10.5} from={-4.2} to={4.2} facing={1} />
 
       {/* ---- 楼梯踏面：每隔几级亮一次，上楼时一级级点过去 ---- */}
       <StairMarks />
@@ -125,17 +104,67 @@ function StairMarks() {
     const z = STAIRS.zBottom - ((STAIRS.zBottom - STAIRS.zTop) / STAIRS.steps) * i
     const y = stairHeightAt(z)
     marks.push(
-      <GlowText
+      <GlowEmblem
         key={i}
-        text="UTS"
         color={GREEN}
-        width={0.85}
-        // 踢面朝南（+z）。往前挪 4 厘米，绝不和踢面共面
-        position={[(STAIRS.x0 + STAIRS.x1) / 2, y + 0.085, z + 0.04]}
-        rotation={[0, 0, 0]}
+        size={0.5}
+        /*
+          **平躺在踏面上**，不是贴在踢面上。
+
+          试过贴踢面，结果被踏面挡得几乎看不见：楼梯是一级级离散的台阶，
+          而 `stairHeightAt` 是一条连续斜坡函数，两者对不齐 ——
+          按斜坡算出来的高度落不到实际那块踢面上。
+          平躺在踏面上就没有这个问题，而且上楼时视线本来就朝下，反而更显眼。
+        */
+        position={[(STAIRS.x0 + STAIRS.x1) / 2, y + 0.025, z]}
+        rotation={[-Math.PI / 2, 0, 0]}
         opacity={0.9}
       />,
     )
   }
   return <>{marks}</>
+}
+
+/**
+ * 挑台边缘等距排一列徽记。
+ *
+ * 间距 2 米：太密会连成一条光带、看不出是图案，太疏就撑不起"围了一圈"的感觉。
+ */
+function EmblemRail({
+  axis,
+  at,
+  from,
+  to,
+  facing,
+}: {
+  /** 沿哪个轴铺开 */
+  axis: 'x' | 'z'
+  /** 另一个轴上的固定坐标 */
+  at: number
+  from: number
+  to: number
+  /** 朝向：+1 面向正方向，-1 面向负方向 */
+  facing: 1 | -1
+}) {
+  const step = 2.0
+  const n = Math.max(1, Math.floor((to - from) / step))
+  const rot: [number, number, number] =
+    axis === 'x'
+      ? [0, (Math.PI / 2) * facing, 0]
+      : [0, facing === 1 ? 0 : Math.PI, 0]
+
+  return (
+    <>
+      {Array.from({ length: n + 1 }, (_, i) => {
+        const t = from + ((to - from) / n) * i
+        const pos: [number, number, number] =
+          axis === 'x'
+            ? [at + 0.02 * facing, FLOOR2_Y - SLAB / 2, t]
+            : [t, FLOOR2_Y - SLAB / 2, at + 0.02 * facing]
+        return (
+          <GlowEmblem key={i} color={GREEN} size={0.34} position={pos} rotation={rot} opacity={0.85} />
+        )
+      })}
+    </>
+  )
 }
