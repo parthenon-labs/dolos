@@ -19,6 +19,16 @@ import { PokerActionBar } from './PokerActionBar'
  * 3D 大厅没有废掉：它是进门那一下的氛围和落座，
  * 以及将来摊牌时切回桌上的那一下。
  */
+/** 空位的补位 AI。名字和颜色和大厅里那批同一个风格，看起来是同一个世界的人 */
+const FILLERS = [
+  { name: 'Pell', color: '#9a6b3f' },
+  { name: 'Corvo', color: '#4a6a7a' },
+  { name: 'Juno', color: '#7a4a5f' },
+  { name: 'Bask', color: '#5f7a4a' },
+  { name: 'Mott', color: '#8c5a5a' },
+  { name: 'Rilla', color: '#6d6a94' },
+]
+
 export function PokerTable() {
   const seatedAt = usePlayerStore((s) => s.seatedAt)
   const mode = usePlayerStore((s) => s.mode)
@@ -38,13 +48,22 @@ export function PokerTable() {
   const seats = useMemo(() => {
     if (!seatedAt || !table) return []
     const occ = occupancy[table.id] ?? []
-    return Array.from({ length: table.seats }, (_, i) => ({
-      seat: i,
-      name: i === seatedAt.seat ? '你' : (occ[i]?.name ?? `座位 ${i + 1}`),
-      color: occ[i]?.color ?? '#5a6a7a',
-      isAI: i === seatedAt.seat ? false : (occ[i]?.isAI ?? true),
-      stack: 200,
-    }))
+    return Array.from({ length: table.seats }, (_, i) => {
+      if (i === seatedAt.seat) {
+        return { seat: i, name: '你', color: occ[i]?.color ?? '#c9a227', isAI: false, stack: 200 }
+      }
+      // 空位由 AI 补上 —— 这本来就是这个产品的核心，
+      // 所以它必须有名字和颜色。露出"座位 3"这种占位符
+      // 等于告诉玩家"这里还没做完"
+      const filler = FILLERS[i % FILLERS.length]
+      return {
+        seat: i,
+        name: occ[i]?.name ?? filler.name,
+        color: occ[i]?.color ?? filler.color,
+        isAI: occ[i]?.isAI ?? true,
+        stack: 200,
+      }
+    })
   }, [seatedAt, table, occupancy])
 
   useEffect(() => {
