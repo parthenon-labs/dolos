@@ -1,0 +1,49 @@
+# 推到 main 就自动构建并发布到 GitHub Pages。
+#
+# 这个项目**全部跑在浏览器里**，没有服务端，所以静态托管就够了。
+# 也正因为如此：牌堆在客户端内存里，联机对战之前它只能当 demo，
+# 不能当真正的多人游戏 —— 见 NOTES 的路线图。
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同时只跑一个部署，但不打断进行中的那个
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # 规则引擎的检查跑在构建之前：牌力和边池算错就是把玩家的钱分错，
+      # 这种东西不该有机会上线
+      - run: npm run check
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

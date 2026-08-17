@@ -1,4 +1,5 @@
 import { Canvas } from '@react-three/fiber'
+import { Leva } from 'leva'
 import { Suspense } from 'react'
 import * as THREE from 'three'
 import { Scene } from './scene/Scene'
@@ -22,6 +23,12 @@ export default function App() {
           <Scene />
         </Suspense>
       </Canvas>
+      {/*
+        leva 面板只在开发时显示。
+        不显式挂 <Leva> 的话它会自己创建一个面板 —— 线上 demo 右上角
+        挂着一排调试滑块，看起来像没做完。
+      */}
+      <Leva hidden={!import.meta.env.DEV} />
       <Hud />
       {/*
         牌桌界面盖在 3D 上面，而不是替换掉它。
