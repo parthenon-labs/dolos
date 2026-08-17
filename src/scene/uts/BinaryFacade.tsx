@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
+import { GlowEmblem } from './GlowEmblem'
+import { GlowText } from './GlowText'
 
 /**
  * 「刨丝器」幕墙 —— 向 UTS Building 11（工程与 IT 学院楼）致敬。
@@ -14,6 +16,10 @@ import * as THREE from 'three'
  * 实现用一张 CanvasTexture 而不是上千个 instanced mesh：
  * 一次 draw call，且亮点位置可以精确到像素。
  * 靠 emissive + 已有的 Bloom 发光，**不额外占光源预算**（见 LightBudget）。
+ *
+ * **第二版把二进制压成了底纹。** 满墙同等亮度的绿格子远看就是一片噪点，
+ * 谁也不会知道那是一句话。现在它暗下去当肌理，前面摆校徽和 UTS ——
+ * 主体清楚了，凑近仍然看得到每一位。信息还在，只是不再抢戏。
  */
 
 const PHRASE =
@@ -115,7 +121,9 @@ export function BinaryFacade({
           map={tex}
           emissiveMap={tex}
           emissive="#ffffff"
-          emissiveIntensity={0.55}
+          // 0.09：二进制现在只是**底纹**。第二版之前是 0.55，
+          // 满墙同亮度的绿格子会把校徽压掉，远看就是一片噪点
+          emissiveIntensity={0.09}
           roughness={0.7}
           // metalness 必须低。没有环境贴图时金属面在 three 里几乎全黑，
           // 而这块墙的亮度全靠 emissive —— 金属度一高，底色就死了
@@ -124,8 +132,19 @@ export function BinaryFacade({
         />
       </mesh>
 
-      {/* 铝板的「鳃」—— 真楼上每块板都折出一道棱，让平面产生方向感 */}
-      {Array.from({ length: 9 }, (_, i) => (
+      {/* 校徽 + UTS，压在底纹之上。这才是这面墙现在的主体 */}
+      <GlowEmblem color="#5cf2a4" size={1.75} position={[-2.15, 0, 0.09]} />
+      <GlowText
+        text="UTS"
+        color="#5cf2a4"
+        width={3.5}
+        position={[0.85, 0, 0.09]}
+        rotation={[0, 0, 0]}
+      />
+
+      {/* 铝板的「鳃」—— 真楼上每块板都折出一道棱，让平面产生方向感。
+          只在两侧留几道，中间让给校徽 */}
+      {[0, 1, 7, 8].map((i) => (
         <mesh
           key={i}
           position={[-width / 2 + (width / 9) * (i + 0.5), 0, 0.035]}
