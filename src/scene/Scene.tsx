@@ -12,7 +12,7 @@ import { TableUnit } from './hall/TableUnit'
 import { Effects } from './Effects'
 import { Lighting } from './Lighting'
 import { LightBudget } from './LightBudget'
-import { BinaryFacade } from './uts/BinaryFacade'
+import { SignWall } from './uts/SignWall'
 import { CampusModels } from './uts/CampusModels'
 import { UtsDressing } from './uts/UtsDressing'
 import { CueDriver, useEventBridge } from '../anim/CueDriver'
@@ -63,7 +63,7 @@ export function Scene() {
         位置是挑过的：幕墙在东墙、二楼挑台底下 —— 从南边入口走进来正对着它，
         而且挑台压低了那一片的天花，绿光打在下面刚好。
       */}
-      <BinaryFacade position={[9.82, 1.55, -4]} rotation={[0, -Math.PI / 2, 0]} />
+      <SignWall position={[9.82, 1.55, -4]} rotation={[0, -Math.PI / 2, 0]} />
       <CampusModels position={[-8.4, 0, -8.6]} rotation={[0, Math.PI / 2, 0]} />
       <UtsDressing />
       <ShadowBudget />
