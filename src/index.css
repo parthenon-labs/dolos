@@ -216,3 +216,452 @@ kbd {
   color: rgba(232, 220, 200, 0.78);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
 }
+
+/* =========================================================
+   对局界面（全屏，盖在 3D 之上）
+
+   配色刻意沿用大厅的暖木 + 暗琥珀，而不是另起一套。
+   玩家是从那个酒馆走进来的，换一套冷色调会像切到了另一个产品。
+   ========================================================= */
+
+.match {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #1a120c 0%, #0d0907 55%, #070505 100%);
+  color: #e8ddd0;
+  font: 14px/1.6 system-ui, -apple-system, 'PingFang SC', sans-serif;
+}
+
+/* ---------- 顶栏 ---------- */
+
+.match-top {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #2a1d14;
+  background: #100b08;
+}
+.match-top .brand {
+  font: 600 13px/1 system-ui;
+  letter-spacing: 0.32em;
+  color: #c9a227;
+}
+.match-top .top-right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+.ghost-btn {
+  padding: 6px 14px;
+  border: 1px solid #3a2a1e;
+  border-radius: 6px;
+  background: transparent;
+  color: #b9a894;
+  font: inherit;
+  cursor: pointer;
+}
+.ghost-btn:hover {
+  border-color: #6a4f38;
+  color: #e8ddd0;
+}
+
+/* ---------- 任务进度 ---------- */
+
+.quest-track {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.quest-track .quests {
+  display: flex;
+  gap: 8px;
+}
+.quest-track .q {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid #3a2a1e;
+  color: #7d6a58;
+  font-weight: 600;
+}
+.quest-track .q.now {
+  border-color: #c9a227;
+  color: #f0d68a;
+  box-shadow: 0 0 0 3px #c9a2271f;
+}
+.quest-track .q.ok {
+  border-color: #3fbf6a;
+  background: #143d24;
+  color: #9ce8b4;
+}
+.quest-track .q.bad {
+  border-color: #d0402e;
+  background: #451512;
+  color: #f0a89c;
+}
+.quest-track .q .fails {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: #d0402e;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.rejects {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #9a8875;
+  font-size: 13px;
+}
+.rejects .dots {
+  display: flex;
+  gap: 4px;
+}
+.rejects .dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid #4a3728;
+}
+.rejects .dots i.on {
+  background: #d0402e;
+  border-color: #d0402e;
+}
+/* 连续 5 次否决坏人直接赢。这是新手最常忽略的输法，所以到第 4 次就必须扎眼 */
+.rejects.danger {
+  color: #f0a89c;
+}
+.rejects.danger em {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #451512;
+  font-style: normal;
+}
+
+/* ---------- 主体 ---------- */
+
+.match-body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 0;
+}
+.match-body aside {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-right: 1px solid #2a1d14;
+  overflow-y: auto;
+}
+.match-body main {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 座位列 ---------- */
+
+.seat-col {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.seat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  transition: background 0.14s, border-color 0.14s;
+}
+.seat-row.me {
+  background: #1a1209;
+  border-color: #4a3a1a;
+}
+.seat-row.on-team {
+  border-color: #3f6f8f;
+  background: #10202a;
+}
+.seat-row.pickable {
+  cursor: pointer;
+}
+.seat-row.pickable:hover {
+  background: #221710;
+}
+.seat-row.picked {
+  border-color: #c9a227;
+  background: #251b0c;
+}
+.seat-row .seat-no {
+  width: 18px;
+  text-align: center;
+  color: #7d6a58;
+  font-size: 12px;
+}
+.seat-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.seat-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.seat-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.tag.leader { background: #3a2a08; color: #e8c65a; }
+.tag.team   { background: #10303f; color: #7fc4e8; }
+.tag.evil   { background: #3d1210; color: #f0a89c; }
+.tag.maybe  { background: #2a2140; color: #b6a8e8; }
+
+em.ai {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #14322c;
+  color: #5fd0b0;
+  font: 500 10px/16px system-ui;
+  font-style: normal;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- 头像 ---------- */
+
+.avatar { flex: none; display: block; }
+.avatar.dim { opacity: 0.35; }
+.avatar.speaking {
+  filter: drop-shadow(0 0 6px var(--mask));
+}
+
+/* ---------- 身份牌 ---------- */
+
+.role-card {
+  margin-top: auto;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #3a2a1e;
+  background: #130d09;
+  font-size: 13px;
+}
+.role-card.evil { border-color: #4d1f1a; }
+.role-card.good { border-color: #1f4d3a; }
+.role-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.role-head .side { font-size: 11px; color: #8a7663; }
+.role-head b { font-size: 17px; }
+.role-card.evil .role-head b { color: #f0a89c; }
+.role-card.good .role-head b { color: #9ce8b4; }
+.role-card .know { margin-top: 8px; }
+.role-card .know > span { color: #8a7663; font-size: 12px; }
+.role-card .know ul { margin: 4px 0 0; padding-left: 16px; }
+.role-card .warn {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid #2a1d14;
+  color: #c9a227;
+  font-size: 12px;
+}
+
+/* ---------- 发言记录 ---------- */
+
+.transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.transcript .empty { color: #6a5a4a; text-align: center; margin-top: 40px; }
+
+.round-divider {
+  margin: 14px 0 6px;
+  text-align: center;
+  color: #7d6a58;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.round-divider::before,
+.round-divider::after {
+  content: '';
+  display: inline-block;
+  width: 60px;
+  height: 1px;
+  margin: 0 12px 4px;
+  background: #2a1d14;
+}
+
+.msg.speech {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  max-width: 780px;
+}
+.msg.speech .bubble {
+  padding: 8px 13px;
+  border-radius: 4px 12px 12px 12px;
+  background: #17110c;
+  border: 1px solid #2a1d14;
+}
+.msg.speech.mine { flex-direction: row-reverse; margin-left: auto; }
+.msg.speech.mine .bubble {
+  border-radius: 12px 4px 12px 12px;
+  background: #1c1509;
+  border-color: #4a3a1a;
+}
+.msg.speech .who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  font-size: 12px;
+  color: #9a8875;
+}
+.msg.speech .who .no {
+  min-width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  background: #2a1d14;
+  color: #c0ab94;
+  text-align: center;
+  line-height: 17px;
+  font-size: 11px;
+}
+.msg.speech p { margin: 0; white-space: pre-wrap; }
+
+.msg.event {
+  max-width: 780px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  border: 1px solid #2a1d14;
+  background: #120d09;
+  font-size: 13px;
+  color: #b9a894;
+}
+.msg.event b { color: #e8ddd0; }
+.msg.event .count { color: #8a7663; font-size: 12px; }
+.msg.event .chips, .msg.event .votes { display: flex; gap: 5px; flex-wrap: wrap; }
+.chip {
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid #4a3728;
+  background: #1a120c;
+  font-size: 12px;
+}
+.chip.ghost { color: #6a5a4a; border-style: dashed; }
+.msg.event .v {
+  width: 21px;
+  height: 21px;
+  border-radius: 5px;
+  text-align: center;
+  line-height: 21px;
+  font-size: 11px;
+}
+.msg.event .v.yes { background: #143d24; color: #9ce8b4; }
+.msg.event .v.no  { background: #451512; color: #f0a89c; }
+.msg.event.vote.pass { border-color: #2b6b42; }
+.msg.event.vote.fail { border-color: #7a2a1f; }
+.msg.event.quest.ok  { border-color: #2b6b42; background: #0f2216; }
+.msg.event.quest.bad { border-color: #7a2a1f; background: #24100d; }
+.msg.event.assassin  { border-color: #7a2a1f; background: #24100d; }
+.msg.event.assassin.hit b { color: #ff8a78; }
+
+.msg.system {
+  align-self: center;
+  color: #7d6a58;
+  font-size: 12px;
+}
+
+.verdict {
+  padding: 16px 26px;
+  border-top: 1px solid #2a1d14;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.verdict b { font-size: 20px; }
+.verdict.good b { color: #9ce8b4; }
+.verdict.evil b { color: #f0a89c; }
+.verdict span { color: #8a7663; }
+
+/* ---------- 操作区 ---------- */
+
+footer {
+  border-top: 1px solid #2a1d14;
+  background: #100b08;
+}
+.action-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 22px;
+  min-height: 64px;
+}
+.action-bar.idle { color: #6a5a4a; justify-content: center; }
+.action-bar .prompt { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.action-bar .prompt b { color: #f0d68a; }
+.action-bar .hint {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #2a1d14;
+  color: #b9a894;
+  font-size: 12px;
+  font-style: normal;
+}
+.action-bar .picks { display: flex; gap: 6px; flex-wrap: wrap; }
+.action-bar .btns { margin-left: auto; display: flex; gap: 10px; }
+.action-bar button {
+  padding: 9px 22px;
+  border-radius: 7px;
+  border: 1px solid #4a3728;
+  background: #1a120c;
+  color: #e8ddd0;
+  font: 500 14px/1 inherit;
+  cursor: pointer;
+}
+.action-bar button:hover:not(:disabled) { border-color: #6a4f38; }
+.action-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+.action-bar button.primary { margin-left: auto; background: #3a2a08; border-color: #6a5220; color: #f0d68a; }
+.action-bar button.approve { background: #143d24; border-color: #2b6b42; color: #9ce8b4; }
+.action-bar button.reject  { background: #451512; border-color: #7a2a1f; color: #f0a89c; }
+.action-bar button.danger  { background: #451512; border-color: #7a2a1f; color: #f0a89c; }
+.action-bar.assassin { background: #150c0a; }

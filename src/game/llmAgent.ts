@@ -40,7 +40,9 @@ export class LlmAgent implements Agent {
 
   async proposeTeam(v: PlayerView): Promise<PlayerId[]> {
     const r = await this.ask<{ team: number[] }>(v, 'propose', ASK.propose(v))
-    return r.team
+    // 模型说的是 1 起始的座位号，引擎认的是 0 起始的 PlayerId。
+    // 转换只在这一层做 —— 见 prompt.ts 里 n() 的说明
+    return r.team.map(fromSpoken)
   }
 
   async vote(v: PlayerView): Promise<boolean> {
@@ -57,7 +59,7 @@ export class LlmAgent implements Agent {
 
   async assassinate(v: PlayerView): Promise<PlayerId> {
     const r = await this.ask<{ target: number }>(v, 'assassinate', ASK.assassinate(v))
-    return r.target
+    return fromSpoken(r.target)
   }
 
   async bid(v: PlayerView): Promise<number> {
@@ -100,13 +102,21 @@ export function guardSpeech(
 }
 
 /** 返回泄漏原因，没泄漏返回 null */
+/** 模型/人嘴里的 1 起始座位号 → 引擎的 0 起始 PlayerId */
+const fromSpoken = (spoken: number) => spoken - 1
+/** 反向：引擎 PlayerId → 说出来的座位号 */
+const toSpoken = (id: number) => id + 1
+
 export function detectLeak(v: PlayerView, speech: string): string | null {
   const known = v.knowledge.seesEvil
   if (known.length === 0 && v.knowledge.seesMerlinOrMorgana.length === 0) return null
 
-  // 发言里提到的玩家编号
+  // 发言里提到的玩家编号。
+  // **发言里是 1 起始的座位号，knowledge 里是 0 起始的 PlayerId** —— 必须转换。
+  // 忘了这一步的话整层会静默地偏一位：该拦的放行、不该拦的拦下，
+  // 而且因为它只影响"某些"发言，看日志根本发现不了。
   const mentioned = new Set(
-    [...speech.matchAll(/(\d+)\s*号/g)].map((m) => Number(m[1])),
+    [...speech.matchAll(/(\d+)\s*号/g)].map((m) => fromSpoken(Number(m[1]))),
   )
 
   // 只有靠身份才可能知道的确定性措辞
@@ -116,11 +126,11 @@ export function detectLeak(v: PlayerView, speech: string): string | null {
     // 坏人点名自己的同伙 —— 无论褒贬都是在泄漏阵营结构
     const named = known.filter((p) => mentioned.has(p))
     if (named.length > 0 && certainty) {
-      return `坏人以确定语气点名了同伙 ${named.join('、')}`
+      return `坏人以确定语气点名了同伙 ${named.map(toSpoken).join('、')}`
     }
     // 把同伙**全部**说出来，即使语气不确定也等于交底
     if (known.every((p) => mentioned.has(p)) && known.length > 1) {
-      return `坏人一次说出了全部同伙 ${known.join('、')}`
+      return `坏人一次说出了全部同伙 ${known.map(toSpoken).join('、')}`
     }
   }
 
@@ -128,7 +138,7 @@ export function detectLeak(v: PlayerView, speech: string): string | null {
     // 梅林以确定语气点名真坏人 —— 这是刺客最想要的信号
     const named = known.filter((p) => mentioned.has(p))
     if (named.length > 0 && certainty) {
-      return `梅林以确定语气点名了坏人 ${named.join('、')}`
+      return `梅林以确定语气点名了坏人 ${named.map(toSpoken).join('、')}`
     }
   }
 

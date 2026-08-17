@@ -10,6 +10,20 @@ import { MAX_REJECTS } from './rules'
  * project() 已经在类型层面挡住了越界，这里只负责把该给的说清楚。
  */
 
+/**
+ * 座位号在**给人和给模型看的文字里一律从 1 开始**，引擎内部一律从 0 开始。
+ *
+ * 两套编号并存过一次，后果是模型说"0 号有问题"而界面上根本没有 0 号 ——
+ * 玩家会指错人，而且这种错怪不到任何一行逻辑上。
+ *
+ * 规矩：**只在这一层做转换**。
+ *   出去（写进 prompt）→ n()
+ *   回来（模型给的编号）→ fromSpoken()，见 llmAgent
+ * 引擎、投影、事件流里出现的永远是 0 起始的 PlayerId。
+ */
+export const n = (id: number) => id + 1
+const ns = (ids: number[]) => ids.map(n)
+
 const ROLE_CN: Record<Role, string> = {
   merlin: '梅林', percival: '派西维尔', servant: '忠臣',
   assassin: '刺客', morgana: '莫甘娜', mordred: '莫德雷德',
@@ -19,13 +33,13 @@ const ROLE_CN: Record<Role, string> = {
 /** 每个角色只知道自己那点事，说明也要按角色裁剪 */
 function roleBrief(v: PlayerView): string {
   const r = v.myRole
-  const lines = [`你是 ${v.me} 号，身份是**${ROLE_CN[r]}**（${isEvil(r) ? '坏人阵营' : '好人阵营'}）。`]
+  const lines = [`你是 ${n(v.me)} 号，身份是**${ROLE_CN[r]}**（${isEvil(r) ? '坏人阵营' : '好人阵营'}）。`]
 
   switch (r) {
     case 'merlin':
       lines.push(
         `你能看到坏人是谁，但**莫德雷德对你隐身**，所以你看到的可能不全。`,
-        `你已知的坏人：${v.knowledge.seesEvil.join('、') || '（无）'}。`,
+        `你已知的坏人：${ns(v.knowledge.seesEvil).join('、') || '（无）'}。`,
         `**最大的风险不是任务失败，是被刺客认出来。** 好人就算过了三轮，`,
         `刺客只要指认对你，坏人照样赢。所以你必须故意打得不那么"精准"——`,
         `一个每次都完美避开坏人的玩家，投票记录就是一张写着"我是梅林"的名片。`,
@@ -34,7 +48,7 @@ function roleBrief(v: PlayerView): string {
     case 'percival':
       lines.push(
         `你看到两个人，其中一个是梅林、另一个是莫甘娜，但**你分不清谁是谁**：`,
-        `${v.knowledge.seesMerlinOrMorgana.join(' 和 ') || '（无）'}。`,
+        `${ns(v.knowledge.seesMerlinOrMorgana).join(' 和 ') || '（无）'}。`,
         `你的价值在于保护真梅林、并识破莫甘娜的伪装。`,
       )
       break
@@ -48,7 +62,7 @@ function roleBrief(v: PlayerView): string {
       break
     default:
       lines.push(
-        `你的同伙：${v.knowledge.seesEvil.join('、') || '（无）'}。`,
+        `你的同伙：${ns(v.knowledge.seesEvil).join('、') || '（无）'}。`,
         r === 'assassin'
           ? `如果好人过了三轮任务，**你有一次刺杀机会**：指认梅林就能翻盘。所以从现在起就要留意谁的判断"太准了"。`
           : `如果好人过了三轮，刺客会有一次刺杀梅林的机会，你要帮他找出梅林。`,
@@ -69,9 +83,9 @@ function history(v: PlayerView): string {
   if (v.proposals.length === 0) return '（还没有任何提名）'
   const out: string[] = []
   for (const p of v.proposals) {
-    const yes = p.votes.map((x, i) => (x ? i : -1)).filter((i) => i >= 0)
+    const yes = p.votes.map((x, i) => (x ? n(i) : -1)).filter((i) => i >= 0)
     out.push(
-      `第 ${p.questIndex + 1} 轮 · ${p.leader} 号提名 [${p.team.join(', ')}]` +
+      `第 ${p.questIndex + 1} 轮 · ${n(p.leader)} 号提名 [${ns(p.team).join(', ')}]` +
         ` → 同意 ${yes.length}/${p.votes.length}（${yes.join(',') || '无'}）` +
         ` → ${p.approved ? '通过' : '否决'}`,
     )
@@ -95,7 +109,7 @@ function scoreboard(v: PlayerView): string {
 
 function transcript(v: PlayerView): string {
   if (v.transcript.length === 0) return '（本局还没有人发言）'
-  return v.transcript.map((t) => `${t.player} 号：${t.text}`).join('\n')
+  return v.transcript.map((t) => `${n(t.player)} 号：${t.text}`).join('\n')
 }
 
 /** 所有决策共用的背景。放在 system 里，便于命中提示缓存 */
@@ -129,7 +143,7 @@ export function situation(v: PlayerView): string {
     `本局发言：`,
     transcript(v),
     ``,
-    `当前：第 ${v.quests.length + 1} 轮，${v.leader} 号是队长，本轮任务需要 ${v.teamSize} 人` +
+    `当前：第 ${v.quests.length + 1} 轮，${n(v.leader)} 号是队长，本轮任务需要 ${v.teamSize} 人` +
       (v.needsTwoFails ? '，**本轮需要两张失败牌才算失败**' : '') +
       `。已连续否决 ${v.consecutiveRejects} 次。`,
   ].join('\n')
@@ -147,7 +161,7 @@ export const ASK = {
         team: {
           type: 'array',
           items: { type: 'integer' },
-          description: `${v.teamSize} 个不重复的玩家编号，范围 0-${v.playerCount - 1}`,
+          description: `${v.teamSize} 个不重复的玩家编号，范围 1-${v.playerCount}`,
         },
       },
       required: ['reasoning', 'team'],
@@ -157,7 +171,7 @@ export const ASK = {
 
   vote: (v: PlayerView) => ({
     user:
-      `${situation(v)}\n\n${v.leader} 号提名的队伍是 [${v.team.join(', ')}]。` +
+      `${situation(v)}\n\n${n(v.leader)} 号提名的队伍是 [${ns(v.team).join(', ')}]。` +
       `你同意让这支队伍出发吗？\n` +
       (v.consecutiveRejects >= MAX_REJECTS - 1
         ? `注意：这是第 ${v.consecutiveRejects + 1} 次表决，再否决一次坏人直接获胜。`
@@ -199,7 +213,7 @@ export const ASK = {
       type: 'object',
       properties: {
         reasoning: { type: 'string' },
-        target: { type: 'integer', description: `玩家编号，0-${v.playerCount - 1}` },
+        target: { type: 'integer', description: `玩家编号，1-${v.playerCount}` },
       },
       required: ['reasoning', 'target'],
       additionalProperties: false,

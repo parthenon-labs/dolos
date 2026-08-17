@@ -48,6 +48,14 @@ export async function runGame(
   makeAgents: (roles: GameState['roles']) => Agent[],
   /** 每次提名前的讨论轮数。规则 bot 不发言，设 0 即可 */
   discussionRounds = 0,
+  /**
+   * 每产生一条事件就回调一次。
+   *
+   * 返回值里的 events 是跑完才有的，界面需要**边跑边看**。
+   * 服务端广播走的也是这个钩子 —— 一条事件产生的瞬间就该发出去，
+   * 不能等整局结束。回调里抛错会中断整局，所以实现必须自己吞掉异常。
+   */
+  onEvent?: (e: GameEvent) => void,
 ): Promise<GameResult> {
   let { state, events } = startGame(config)
   const agents = makeAgents(state.roles)
@@ -57,6 +65,7 @@ export async function runGame(
   const emit = (e: GameEvent) => {
     events.push(e)
     state = reduce(state, e)
+    onEvent?.(e)
   }
 
   const guard = async <T>(
