@@ -14,6 +14,7 @@ import { Lighting } from './Lighting'
 import { LightBudget } from './LightBudget'
 import { BinaryFacade } from './uts/BinaryFacade'
 import { CampusModels } from './uts/CampusModels'
+import { UtsDressing } from './uts/UtsDressing'
 import { CueDriver, useEventBridge } from '../anim/CueDriver'
 import { useDemoGame } from '../anim/useDemoGame'
 import { useTableView } from '../state/useTableStore'
@@ -64,6 +65,7 @@ export function Scene() {
       */}
       <BinaryFacade position={[9.82, 1.55, -4]} rotation={[0, -Math.PI / 2, 0]} />
       <CampusModels position={[-8.4, 0, -8.6]} rotation={[0, Math.PI / 2, 0]} />
+      <UtsDressing />
       <ShadowBudget />
       <LightBudget />
       <CueDriver />

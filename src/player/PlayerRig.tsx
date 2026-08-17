@@ -105,11 +105,15 @@ export function PlayerRig() {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
     const d = (w.__dolos ?? (w.__dolos = {})) as Record<string, unknown>
-    d.tp = (x: number, z: number, lookYaw?: number) => {
+    d.tp = (x: number, z: number, lookYaw?: number, lookPitch?: number) => {
       pos.current.set(x, z)
       if (lookYaw !== undefined) {
         yaw.current = lookYaw
         targetYaw.current = lookYaw
+      }
+      if (lookPitch !== undefined) {
+        pitch.current = lookPitch
+        targetPitch.current = lookPitch
       }
       return `传送到 ${x}, ${z}`
     }
