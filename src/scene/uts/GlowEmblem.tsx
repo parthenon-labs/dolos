@@ -18,6 +18,18 @@ import emblemUrl from './emblem.png'
 
 const CACHE = new Map<string, THREE.CanvasTexture>()
 
+/** 画布留白占比。留白必须大于最大模糊半径，否则光晕会在贴图边缘被硬切 */
+const PAD_RATIO = 0.22
+
+/**
+ * 图案在整个平面里占多大比例。
+ *
+ * **按尺寸对齐时必须用它换算。** `size` 是平面的边长，而平面里有一圈留白，
+ * 图案只占中间这一块 —— 直接拿 size 去和别的东西对高度，
+ * 结果永远偏小，而且小得很难解释（"我明明设成一样大了"）。
+ */
+export const EMBLEM_ART_FRACTION = 1 / (1 + PAD_RATIO * 2)
+
 function buildTexture(img: HTMLImageElement, color: string): THREE.CanvasTexture {
   const key = color
   const hit = CACHE.get(key)
@@ -26,7 +38,7 @@ function buildTexture(img: HTMLImageElement, color: string): THREE.CanvasTexture
   const size = 512
   // 留白必须大于最大模糊半径，否则光晕会在贴图边缘被硬切，
   // 表现是徽记周围浮着一个方框（见 GlowText 里同一条注释）
-  const pad = Math.round(size * 0.22)
+  const pad = Math.round(size * PAD_RATIO)
   const w = size + pad * 2
 
   // 第一步：把源图变成"盾形不透明、其余全透明"，并染成发光色
