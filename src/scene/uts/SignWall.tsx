@@ -9,126 +9,110 @@ import { EMBLEM_ART_FRACTION, GlowEmblem } from './GlowEmblem'
  * 这里保留"一格一格的穿孔铝板 + 绿色背光"这个形式，
  * 点亮的格子拼出 UTS，其余熄灭当肌理，校徽单独放在左边。
  *
- * **字形是手排的点阵，不是把字体渲染下来再阈值化。**
- * 试过取样：18 行的分辨率下 S 的曲线必然断成几截，
- * 换字号、换阈值都救不回来 —— 低分辨率点阵里，
- * "让字体来决定形状"这个偷懒的做法本身就是错的。
- * 三个字母手排一次，字形从此确定。
+ * **亮格填满、板缝最后统一压一层。**
+ * 每格留白 + 中间点白芯的做法凑近看就是一串互不相连的小方块，
+ * 那是"很多颗 LED"，不是"一块背光的板"。真实的背光穿孔板是
+ * 连续的光源在背后、网格盖在光上面 —— 这里按这个顺序画。
  */
 
-/** 网格密度。别调密：格子越小越容易被 mipmap 平均掉，远看会糊成一片 */
-const COLS = 52
-const ROWS = 18
-
 /**
- * 手排的 9×11 点阵字形。`#` = 亮。
+ * 网格密度。
  *
- * 笔画统一 2 格宽（T 的竖笔 3 格，否则在 9 格宽里看着太细）。
- * S 的关键是**上半只留左边、下半只留右边**，中间横笔把两段接起来 ——
- * 两边都画就会变成 8。
+ * 第一版用 52×18，格子太大：凑近看每一格都是独立的小方块，
+ * 笔画连不起来，读成一串珠子而不是一笔。这个分辨率下 S 尤其惨。
+ * 现在细到 104×36，单格约 7 厘米 —— 和真穿孔板的孔距是一个量级，
+ * 字的边缘阶梯也小到看不出来。
  */
-const GLYPHS: Record<string, string[]> = {
-  U: [
-    '##.....##',
-    '##.....##',
-    '##.....##',
-    '##.....##',
-    '##.....##',
-    '##.....##',
-    '##.....##',
-    '##.....##',
-    '##.....##',
-    '.#######.',
-    '..#####..',
-  ],
-  T: [
-    '#########',
-    '#########',
-    '...###...',
-    '...###...',
-    '...###...',
-    '...###...',
-    '...###...',
-    '...###...',
-    '...###...',
-    '...###...',
-    '...###...',
-  ],
-  S: [
-    '.#######.',
-    '##.....##',
-    '##.......',
-    '##.......',
-    '##.......',
-    '.#######.',
-    '.......##',
-    '.......##',
-    '.......##',
-    '##.....##',
-    '.#######.',
-  ],
-}
+const COLS = 104
+const ROWS = 36
 
-const GLYPH_W = 9
-const GLYPH_H = 11
-const GAP = 3
-const WORD = 'UTS'
-
-/**
- * 字块在网格里的位置：左边留给校徽，右边留余量。
- * 字块宽 33 列（3×9 + 2×3），起 17 结 49，右边空 2 列 ——
- * 顶到最后一列会紧贴边框上那道「鳃」，看起来像被切了。
- */
-const TEXT_COL = 17
-const TEXT_ROW = Math.floor((ROWS - GLYPH_H) / 2)
+/** 字块占的列区间，左边留给校徽 */
+const TEXT_FROM = 34
+const TEXT_TO = 100
+/** 字块占的行区间 */
+const TEXT_TOP = 5
+const TEXT_BOTTOM = 31
 
 function litMask(): boolean[][] {
-  const lit = Array.from({ length: ROWS }, () => Array<boolean>(COLS).fill(false))
-  let col = TEXT_COL
-  for (const ch of WORD) {
-    const g = GLYPHS[ch]
-    for (let r = 0; r < GLYPH_H; r++) {
-      for (let c = 0; c < GLYPH_W; c++) {
-        if (g[r][c] === '#') lit[TEXT_ROW + r][col + c] = true
-      }
-    }
-    col += GLYPH_W + GAP
+  const m = document.createElement('canvas')
+  m.width = COLS
+  m.height = ROWS
+  const g = m.getContext('2d')!
+  g.fillStyle = '#000'
+  g.fillRect(0, 0, COLS, ROWS)
+
+  /*
+    36 行的分辨率下可以放心让字体来画字形了。
+    上一版是 18 行，那个高度上 S 的曲线必然断成几截，只能手排点阵；
+    行数翻倍之后这个问题自己就没了。
+  */
+  const size = TEXT_BOTTOM - TEXT_TOP
+  g.fillStyle = '#fff'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.font = `900 ${size}px "Helvetica Neue", Arial, sans-serif`
+  const w = TEXT_TO - TEXT_FROM
+  const measured = g.measureText('UTS').width
+  g.save()
+  g.translate((TEXT_FROM + TEXT_TO) / 2, (TEXT_TOP + TEXT_BOTTOM) / 2)
+  g.scale(Math.min(1.25, (w * 0.96) / measured), 1)
+  g.fillText('UTS', 0, 0)
+  g.restore()
+
+  const px = g.getImageData(0, 0, COLS, ROWS).data
+  const out: boolean[][] = []
+  for (let r = 0; r < ROWS; r++) {
+    const row: boolean[] = []
+    for (let c = 0; c < COLS; c++) row.push(px[(r * COLS + c) * 4] > 110)
+    out.push(row)
   }
-  return lit
+  return out
 }
 
 function makeTexture(): THREE.CanvasTexture {
   const lit = litMask()
-  const cell = 20
+  const cell = 12
   const c = document.createElement('canvas')
   c.width = COLS * cell
   c.height = ROWS * cell
   const g = c.getContext('2d')!
 
-  g.fillStyle = '#0d1012'
+  g.fillStyle = '#101416'
   g.fillRect(0, 0, c.width, c.height)
 
+  /*
+    亮格**填满整格、不留内边距**，相邻的格子于是连成一片连续的笔画。
+    上一版每格四周留白、中间还点一个白芯，凑近看就是一串互不相连的小方块 ——
+    那是"很多颗 LED"，不是"一块背光的板"。
+
+    真实的背光穿孔板是反过来的：光源在背后是连续的，
+    网格是**盖在光上面的缝**。所以这里先铺连续的光，最后再统一压一层缝。
+  */
   for (let r = 0; r < ROWS; r++) {
     for (let col = 0; col < COLS; col++) {
+      if (!lit[r][col]) continue
       const x = col * cell
       const y = r * cell
-      // 熄灭的格子也要画出来：没有它们就不是一块穿孔板，只是几个飘着的方块
-      g.fillStyle = '#151a1d'
-      g.fillRect(x + 1, y + 1, cell - 2, cell - 2)
-
-      if (!lit[r][col]) continue
-
-      // 亮格填满，不画小圆点 —— 小点在远处会被 mipmap 平均没
-      const pad = cell * 0.1
-      const grad = g.createLinearGradient(x, y, x, y + cell)
-      grad.addColorStop(0, '#7dffc0')
-      grad.addColorStop(1, '#25b877')
-      g.fillStyle = grad
-      g.fillRect(x + pad, y + pad, cell - pad * 2, cell - pad * 2)
-      g.fillStyle = '#e6fff2'
-      g.fillRect(x + cell * 0.34, y + cell * 0.34, cell * 0.32, cell * 0.32)
+      const t = r / ROWS
+      // 上浅下深的渐变，让整块字有体积，而不是一片纯色
+      g.fillStyle = `rgb(${Math.round(90 - t * 40)}, ${Math.round(255 - t * 60)}, ${Math.round(180 - t * 60)})`
+      g.fillRect(x, y, cell, cell)
     }
   }
+
+  // 板缝：整块板统一压一层，亮的暗的一视同仁 —— 这才是"同一块板"
+  g.strokeStyle = 'rgba(0, 0, 0, 0.5)'
+  g.lineWidth = Math.max(1, cell * 0.13)
+  g.beginPath()
+  for (let col = 0; col <= COLS; col++) {
+    g.moveTo(col * cell, 0)
+    g.lineTo(col * cell, c.height)
+  }
+  for (let r = 0; r <= ROWS; r++) {
+    g.moveTo(0, r * cell)
+    g.lineTo(c.width, r * cell)
+  }
+  g.stroke()
 
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
@@ -159,12 +143,12 @@ export function SignWall({
          图案只占 EMBLEM_ART_FRACTION。直接把 size 设成字高，
          画出来会明显偏小 —— 这就是上一版"logo 小了"的原因
   */
-  const letterH = (height * GLYPH_H) / ROWS
+  const letterH = (height * (TEXT_BOTTOM - TEXT_TOP)) / ROWS
   const emblemSize = letterH / EMBLEM_ART_FRACTION
   // 字块中心在网格里的行位置 → 平面局部坐标（y 向上，中心为 0）
-  const letterCenterY = height * (0.5 - (TEXT_ROW + GLYPH_H / 2) / ROWS)
+  const letterCenterY = height * (0.5 - (TEXT_TOP + TEXT_BOTTOM) / 2 / ROWS)
   // 校徽横向摆在字块左边那片空列的中间
-  const emblemX = -width / 2 + (width * (TEXT_COL / 2)) / COLS
+  const emblemX = -width / 2 + (width * (TEXT_FROM / 2)) / COLS
 
   return (
     <group position={position} rotation={rotation}>
