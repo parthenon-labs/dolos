@@ -3,8 +3,7 @@ import { Leva } from 'leva'
 import { Suspense } from 'react'
 import * as THREE from 'three'
 import { Scene } from './scene/Scene'
-import { Hud } from './ui/Hud'
-import { SeatedOverlay } from './ui/SeatedOverlay'
+import { Shell } from './ui/Shell'
 
 export default function App() {
   return (
@@ -29,13 +28,13 @@ export default function App() {
         挂着一排调试滑块，看起来像没做完。
       */}
       <Leva hidden={!import.meta.env.DEV} />
-      <Hud />
       {/*
-        游戏界面盖在 3D 上面，而不是替换掉它。
-        3D 继续渲染是有意的：离席时能直接切回大厅，不用重建整个场景；
-        换游戏也只是换这一层里挂的是谁。
+        大厅、房间、牌桌全部盖在 3D 上面，而不是替换掉它。
+        3D 一直在背后渲染是有意的：那座酒馆现在是**背景**，
+        它把一个网页棋牌室和一个有地方感的产品分开。
+        切屏只是换这一层里挂的是谁，场景不重建。
       */}
-      <SeatedOverlay />
+      <Shell />
     </>
   )
 }

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useGameStore } from '../../state/useGameStore'
-import { usePlayerStore } from '../../state/usePlayerStore'
-import { tableById } from '../../scene/hallLayout'
+import { useLobby, useMyRoom } from '../../lobby/useLobby'
+import { useRoster } from '../../games/seats'
 import { startSession } from '../../poker/session'
 import { useTable } from '../../poker/useTable'
 import { describe, evaluate } from '../../poker/evaluate'
@@ -11,22 +10,6 @@ import { Chips } from './Chips'
 import { HandRankings, HowToPlay } from './HandRankings'
 import { PlayingCard } from './PlayingCard'
 import { PokerActionBar } from './PokerActionBar'
-
-/**
- * 空位的补位 AI。
- *
- * 名字取自 UTS 周边的地名和人 —— Ultimo / Broadway / Haymarket 是校区所在，
- * Dysart 是 UTS Tower 的建筑师，Gehry 是 Building 8 的设计者。
- * 一桌陌生人如果只叫 P0…P5，坐下来是没有"这是个地方"的感觉的。
- */
-const FILLERS = [
-  { name: 'Ultimo', color: '#9a6b3f' },
-  { name: 'Broadway', color: '#4a6a7a' },
-  { name: 'Haymarket', color: '#7a4a5f' },
-  { name: 'Dysart', color: '#5f7a4a' },
-  { name: 'Gehry', color: '#8c5a5a' },
-  { name: 'Alumni', color: '#6d6a94' },
-]
 
 /**
  * 全屏德州扑克桌。
@@ -42,10 +25,12 @@ const FILLERS = [
  * 玩家不需要学，也顺手绕开了第一人称的视野问题。
  */
 export function PokerTable() {
-  const seatedAt = usePlayerStore((s) => s.seatedAt)
-  const mode = usePlayerStore((s) => s.mode)
-  const stand = usePlayerStore((s) => s.beginStand)
-  const occupancy = useGameStore((s) => s.occupancy)
+  const room = useMyRoom()
+  // 「回房间」是这一局打完了回等待室，「离开」是走人回大厅
+  const back = useLobby((s) => s.endGame)
+  const stand = useLobby((s) => s.leave)
+  // 德州的人数吃满房间容量，其余两个游戏各有自己的定数
+  const roster = useRoster(room?.max ?? 0)
 
   const view = useTable((s) => s.view)
   const pending = useTable((s) => s.pending)
@@ -57,40 +42,25 @@ export function PokerTable() {
 
   const [sheet, setSheet] = useState<null | 'ranks' | 'how'>(null)
 
-  const table = seatedAt ? tableById(seatedAt.tableId) : undefined
-
-  const seats = useMemo(() => {
-    if (!seatedAt || !table) return []
-    const occ = occupancy[table.id] ?? []
-    return Array.from({ length: table.seats }, (_, i) => {
-      if (i === seatedAt.seat) {
-        return { seat: i, name: '你', color: occ[i]?.color ?? '#c9a227', isAI: false, stack: 200 }
-      }
-      const filler = FILLERS[i % FILLERS.length]
-      return {
-        seat: i,
-        name: occ[i]?.name ?? filler.name,
-        color: occ[i]?.color ?? filler.color,
-        isAI: occ[i]?.isAI ?? true,
-        stack: 200,
-      }
-    })
-  }, [seatedAt, table, occupancy])
+  const seats = useMemo(
+    () => roster.map((r) => ({ ...r, stack: 200 })),
+    [roster],
+  )
 
   useEffect(() => {
-    if (mode !== 'seated' || !seatedAt || seats.length < 2) return
-    return startSession({ seats, mySeat: seatedAt.seat, hands: 500 })
-  }, [mode, seatedAt, seats])
+    if (seats.length < 2) return
+    return startSession({ seats, mySeat: 0, hands: 500 })
+  }, [seats])
 
   const logBox = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (logBox.current) logBox.current.scrollTop = logBox.current.scrollHeight
   }, [log])
 
-  if (mode !== 'seated' || !seatedAt) return null
+  if (!room || seats.length < 2) return null
 
   const n = seats.length
-  const mySeat = seatedAt.seat
+  const mySeat = 0
   const pot =
     (view?.pots.reduce((a, p) => a + p.amount, 0) ?? 0) +
     (view?.players.reduce((a, p) => a + p.committed, 0) ?? 0)
@@ -138,8 +108,11 @@ export function PokerTable() {
           </button>
         </div>
         <div className="playmoney">虚拟筹码 · 不可充值提现</div>
+        <button className="ghost-btn" onClick={back}>
+          回房间
+        </button>
         <button className="ghost-btn leave" onClick={stand}>
-          离席
+          离开
         </button>
       </header>
 

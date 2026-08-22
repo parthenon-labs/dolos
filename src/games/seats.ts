@@ -1,7 +1,5 @@
 import { useMemo } from 'react'
-import { useGameStore } from '../state/useGameStore'
-import { usePlayerStore } from '../state/usePlayerStore'
-import { tableById } from '../scene/hallLayout'
+import { useMyRoom } from '../lobby/useLobby'
 
 /**
  * 空位的补位 AI。
@@ -27,39 +25,33 @@ export type RosterSeat = {
 }
 
 /**
- * 这一局的名单：你 + 若干补位 AI。
+ * 这一局的名单：你 + 房里其余的人。
  *
- * `count` 由游戏决定（斗地主永远 3），**不是椅子数** ——
- * 六人桌开斗地主只坐三个人。你永远排在 0 号，
- * 各游戏内部的座位号从这里起算，和 3D 大厅里那把椅子的编号无关：
- * 大厅的椅子编号是空间概念，牌局的座位号是规则概念，混在一起迟早出事。
+ * `count` 由游戏决定（斗地主永远 3），**不是房间容量** ——
+ * 虽然现在建房时容量就按游戏定死了，这个区分还是要留着：
+ * 以后一间房里换着玩不同游戏时，人数是会变的。
+ *
+ * **你永远排在 0 号**。各游戏内部的座位号从这里起算，
+ * 和房间里的排位无关 —— 房间里的位次是社交概念，
+ * 牌局的座位号是规则概念，混在一起迟早出事。
  */
 export function useRoster(count: number): RosterSeat[] {
-  const seatedAt = usePlayerStore((s) => s.seatedAt)
-  const occupancy = useGameStore((s) => s.occupancy)
+  const room = useMyRoom()
 
   return useMemo(() => {
-    if (!seatedAt || count <= 0) return []
-    const table = tableById(seatedAt.tableId)
-    const occ = (table && occupancy[table.id]) || []
-    const mine = occ[seatedAt.seat]
-
+    if (!room || count <= 0) return []
+    const me = room.players.find((p) => !p.isAI)
     const roster: RosterSeat[] = [
-      { seat: 0, name: '你', color: mine?.color ?? '#c9a227', isAI: false },
+      { seat: 0, name: '你', color: me?.color ?? '#e2743a', isAI: false },
     ]
-    // 补位从大厅里那张桌子上真实坐着的 AI 取起，取不满再拿 FILLERS 兜底 ——
-    // 这样你在大厅看到的是谁，坐下之后对面就是谁
-    const others = occ.filter((_, i) => i !== seatedAt.seat).filter(Boolean)
+    // 房里其他人先上，不够再拿 FILLERS 兜底 ——
+    // 你在房间里看到的是谁，开局之后对面就是谁
+    const others = room.players.filter((p) => p.isAI)
     for (let i = 1; i < count; i++) {
       const o = others[i - 1]
       const f = FILLERS[(i - 1) % FILLERS.length]
-      roster.push({
-        seat: i,
-        name: o?.name ?? f.name,
-        color: o?.color ?? f.color,
-        isAI: true,
-      })
+      roster.push({ seat: i, name: o?.name ?? f.name, color: o?.color ?? f.color, isAI: true })
     }
     return roster
-  }, [seatedAt, occupancy, count])
+  }, [room, count])
 }

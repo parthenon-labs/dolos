@@ -19,6 +19,14 @@ export type GameDef = {
   tagline: string
   /** 参与人数区间 */
   players: { min: number; max: number }
+  /**
+   * 这个游戏的主色。
+   *
+   * 大厅里一屏有七八行房间，**玩家是靠颜色扫的，不是靠读字的** ——
+   * 三种游戏必须在余光里就能分开。所以颜色定义在这里而不是散在 CSS，
+   * 房间行、标签页、创建面板用的是同一个值。
+   */
+  accent: string
 }
 
 export const GAMES: GameDef[] = [
@@ -27,18 +35,21 @@ export const GAMES: GameDef[] = [
     name: '德州扑克',
     tagline: '两到六人。盲注、四条街、边池、摊牌，规则是完整的。',
     players: { min: 2, max: 6 },
+    accent: '#d9483f',
   },
   {
     id: 'ddz',
     name: '斗地主',
     tagline: '三人。叫地主、抢地主，炸弹翻倍，春天再翻。',
     players: { min: 3, max: 3 },
+    accent: '#e8952f',
   },
   {
     id: 'catan',
     name: '卡坦岛',
     tagline: '三到四人。掷骰、造路建村、强盗、发展卡，十分获胜。',
     players: { min: 3, max: 4 },
+    accent: '#3f9c62',
   },
 ]
 

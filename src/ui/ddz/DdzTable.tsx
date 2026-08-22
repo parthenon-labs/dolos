@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { usePlayerStore } from '../../state/usePlayerStore'
+import { useLobby } from '../../lobby/useLobby'
 import { useRoster } from '../../games/seats'
 import { formatRanks, sortCards, type Card } from '../../ddz/cards'
 import { beats, candidates, describeCombo, parse } from '../../ddz/combo'
@@ -23,8 +23,10 @@ import { CardRow, DdzCard } from './DdzCard'
  *   藏进小字里等于把游戏的心跳关掉了
  */
 export function DdzTable() {
-  const stand = usePlayerStore((s) => s.beginStand)
-  const back = usePlayerStore((s) => s.chooseGame)
+  // 「回房间」是这一局打完了回到等待室，「离开」是彻底走人回大厅。
+  // 两个出口都要有：连着再来一局是常态，而离席是偶尔
+  const back = useLobby((s) => s.endGame)
+  const stand = useLobby((s) => s.leave)
   const roster = useRoster(3)
 
   const view = useDdz((s) => s.view)
@@ -79,7 +81,7 @@ export function DdzTable() {
   if (!view) {
     return (
       <div className="ddz">
-        <Top gameNo={0} view={null} onBack={() => back(null)} onStand={stand} />
+        <Top gameNo={0} view={null} onBack={back} onStand={stand} />
         <div className="ddz-loading">正在发牌…</div>
       </div>
     )
@@ -87,7 +89,7 @@ export function DdzTable() {
 
   return (
     <div className="ddz">
-      <Top gameNo={gameNo} view={view} onBack={() => back(null)} onStand={stand} />
+      <Top gameNo={gameNo} view={view} onBack={back} onStand={stand} />
 
       <div className="ddz-body">
         <div className="ddz-felt">
@@ -307,10 +309,10 @@ function Top({
       </div>
       <div className="tools">
         <button className="ghost-btn" onClick={onBack}>
-          换游戏
+          回房间
         </button>
         <button className="ghost-btn" onClick={onStand}>
-          起身
+          离开
         </button>
       </div>
       <div className="playmoney">虚拟积分 · 不可充值提现</div>

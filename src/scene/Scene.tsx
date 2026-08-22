@@ -3,10 +3,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { loudestAt } from '../audio/amplitudes'
 import { startFakeDriver } from '../audio/fakeDriver'
 import { useGameStore } from '../state/useGameStore'
-import { usePlayerStore } from '../state/usePlayerStore'
-import { PlayerRig } from '../player/PlayerRig'
-import { SeatPicker } from '../player/SeatPicker'
-import { TABLES, tableById } from './hallLayout'
+import { BackdropCamera } from './BackdropCamera'
+import { TABLES } from './hallLayout'
 import { Hall } from './hall/Hall'
 import { TableUnit } from './hall/TableUnit'
 import { Effects } from './Effects'
@@ -27,22 +25,31 @@ import { gestureAtTable, registeredSeats, setActiveTable } from './character/rig
 // 清单为空时这是个空操作。
 preloadModels()
 
-export function Scene() {
-  // 落座后自动开一局演示对局。接 WebSocket 后换成真实事件源，
-  // useEventBridge 那边一行不用改。
-  const seated = usePlayerStore((s) => s.mode === 'seated')
-  const seatedAt = usePlayerStore((s) => s.seatedAt)
-  // 人数必须跟着实际桌子走 —— 写死 5 的话坐到 6 人桌上会少一个人的动画
-  const seatCount = seatedAt ? (tableById(seatedAt.tableId)?.seats ?? 5) : 5
-  const demoEvents = useDemoGame(seated, seatCount)
-  useEventBridge(demoEvents, seatCount)
+/**
+ * 大厅从"能走进去的 3D 空间"降级成了**背景**。
+ *
+ * 玩家现在在 2D 页面里挑房间，没有人再走进这座酒馆 ——
+ * 但把它删掉是错的：一块会动、有人在打牌的背景，
+ * 是这个产品和一个普通网页棋牌室之间唯一的区别。
+ *
+ * 所以这里做的是减法而不是删除：拿掉 PlayerRig 和 SeatPicker
+ * （走动、落座、指针锁定全部不需要了），换上一台自己慢慢漂移的相机。
+ * 场景、灯光、光源预算、UTS 那些一行没动。
+ */
+const BACKDROP_TABLE = 't3'
+const BACKDROP_SEATS = 5
 
-  // 告诉 rig 登记表手势该往哪张桌子发。
-  // cue 只知道座位号 —— 一局游戏只发生在一张桌子上，桌号是外部上下文。
+export function Scene() {
+  // 背景里那桌人一直在打。**这是有意的** —— 空荡荡的酒馆当背景很惨淡，
+  // 有人在动才叫"营业中"。事件源还是本地假对局，接了 WebSocket 之后
+  // 可以换成真实房间的事件，useEventBridge 那边一行不用改。
+  const demoEvents = useDemoGame(true, BACKDROP_SEATS)
+  useEventBridge(demoEvents, BACKDROP_SEATS)
+
   useEffect(() => {
-    setActiveTable(seated ? (seatedAt?.tableId ?? null) : null)
+    setActiveTable(BACKDROP_TABLE)
     return () => setActiveTable(null)
-  }, [seated, seatedAt])
+  }, [])
 
   // 接真 WebRTC 时，把这一段换成：
   //   import { startWebRTCDriver } from '../audio/webrtcDriver'
@@ -52,8 +59,7 @@ export function Scene() {
 
   return (
     <>
-      <PlayerRig />
-      <SeatPicker />
+      <BackdropCamera />
       <Lighting />
       <Hall />
       {/*
@@ -137,15 +143,10 @@ function ShadowBudget() {
  * 它直接读 amplitudes 内存。
  */
 function SpeakerTracker() {
-  const seatedAt = usePlayerStore((s) => s.seatedAt)
   const setSpeakingKey = useGameStore((s) => s.setSpeakingKey)
 
   useFrame(() => {
-    if (!seatedAt) {
-      setSpeakingKey(null)
-      return
-    }
-    const table = TABLES.find((t) => t.id === seatedAt.tableId)
+    const table = TABLES.find((t) => t.id === BACKDROP_TABLE)
     if (!table) return
     setSpeakingKey(loudestAt(table.id, table.seats))
   })

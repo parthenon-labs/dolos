@@ -34,55 +34,6 @@ kbd {
   color: #f4e9d6;
 }
 
-/* ---------- HUD ---------- */
-
-.hud {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 22px;
-}
-
-.hud-title {
-  font-size: 13px;
-  letter-spacing: 0.34em;
-  font-weight: 600;
-  color: #c9a227;
-  text-shadow: 0 0 18px rgba(201, 162, 39, 0.45);
-}
-
-.hud-sub {
-  margin-top: 5px;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: rgba(232, 220, 200, 0.4);
-}
-
-/* ---------- 准心 ---------- */
-
-/* 不用来瞄椅子 —— 选座是按距离自动选的。只是给视线一个中心参考，
-   所以做得很轻，几乎察觉不到。 */
-.crosshair {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  width: 4px;
-  height: 4px;
-  margin: -2px 0 0 -2px;
-  border-radius: 50%;
-  background: rgba(232, 220, 200, 0.42);
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.85);
-}
-
-/* 按 Esc 解锁后的回场遮罩，比进场页轻得多 */
-.resume-overlay {
-  background: rgba(11, 8, 6, 0.42);
-  backdrop-filter: blur(2px);
-}
-
 /* ---------- 坐下提示（贴在椅子上方，不是屏幕正中） ---------- */
 
 .seat-prompt {
@@ -104,103 +55,6 @@ kbd {
 @keyframes promptIn {
   from { opacity: 0; transform: translateY(5px) scale(0.94); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-/* ---------- 启动遮罩 ---------- */
-
-.start-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: auto;
-  display: grid;
-  place-items: center;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(11, 8, 6, 0.55) 0%,
-    rgba(11, 8, 6, 0.9) 70%
-  );
-  cursor: pointer;
-}
-
-.start-card { text-align: center; }
-
-.start-title {
-  font-size: 34px;
-  letter-spacing: 0.42em;
-  font-weight: 700;
-  color: #c9a227;
-  text-shadow: 0 0 40px rgba(201, 162, 39, 0.5);
-}
-
-.start-desc {
-  margin-top: 12px;
-  font-size: 13px;
-  letter-spacing: 0.16em;
-  color: rgba(232, 220, 200, 0.62);
-}
-
-.start-keys {
-  margin-top: 26px;
-  display: flex;
-  gap: 18px;
-  justify-content: center;
-  font-size: 11px;
-  color: rgba(232, 220, 200, 0.42);
-}
-
-/* ---------- 同桌玩家列表 ---------- */
-
-.hud-bottom {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.chip {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 13px;
-  font-size: 12px;
-  border-radius: 999px;
-  background: rgba(18, 13, 10, 0.72);
-  border: 1px solid rgba(232, 220, 200, 0.09);
-  backdrop-filter: blur(8px);
-  color: rgba(232, 220, 200, 0.62);
-  transition: border-color 160ms, color 160ms, box-shadow 220ms, transform 160ms;
-}
-
-.chip-speaking {
-  color: #fff3dd;
-  border-color: rgba(255, 178, 87, 0.6);
-  box-shadow: 0 0 20px rgba(255, 178, 87, 0.28);
-  transform: translateY(-2px);
-}
-
-.chip-me { border-color: rgba(201, 162, 39, 0.45); }
-
-.chip-empty {
-  color: rgba(232, 220, 200, 0.26);
-  border-style: dashed;
-}
-
-.chip-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex: none;
-}
-
-.ai-badge {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(46, 224, 192, 0.16);
-  color: #2ee0c0;
 }
 
 /* ---------- 场景内名牌（drei <Html>） ---------- */
@@ -1241,79 +1095,6 @@ em.ai {
 .sheet footer b { color: #d4a72c; }
 
 /* =========================================================
-   选择面板
-   落座后的第一屏。背后的 3D 酒馆继续透出来 ——
-   这一层是"桌上摆着的几个盒子"，不是另一个页面。
-   ========================================================= */
-
-.picker {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: center;
-  color: #e9dcc9;
-  background: radial-gradient(120% 80% at 50% 0%, #3a241355 0%, #180f0899 50%, #060403cc 100%);
-  backdrop-filter: blur(20px) saturate(1.3) brightness(0.8);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3) brightness(0.8);
-}
-.picker-inner { width: min(880px, 92vw); text-align: center; }
-.picker-head .brand {
-  font: 600 13px/1 system-ui;
-  letter-spacing: .34em;
-  color: #d4a72c;
-}
-.picker-head h1 {
-  margin: 14px 0 6px;
-  font: 400 30px/1.2 'Iowan Old Style', 'Songti SC', Georgia, serif;
-  color: #f2e6d0;
-}
-.picker-head .dim { margin: 0 0 26px; color: #8a7159; font-size: 13px; }
-
-.picker-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-}
-@media (max-width: 700px) { .picker-grid { grid-template-columns: 1fr; } }
-
-.game-card {
-  display: block;
-  padding: 20px 18px 18px;
-  text-align: left;
-  border: 1px solid #3a2a1e;
-  border-radius: 10px;
-  background: linear-gradient(#1b120bcc, #120c08cc);
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  transition: border-color .16s, background .16s, transform .16s;
-}
-.game-card:hover:not(:disabled) {
-  border-color: #7a5a2e;
-  background: linear-gradient(#241708e6, #170e08e6);
-  transform: translateY(-2px);
-}
-.game-card:disabled { opacity: .4; cursor: not-allowed; }
-
-.game-card-art { height: 54px; margin-bottom: 14px; }
-.game-card-art svg {
-  width: 54px;
-  height: 54px;
-  stroke: #d4a72c;
-  stroke-width: 1.6;
-  stroke-linejoin: round;
-}
-.game-card-art .fill { fill: #d4a72c; stroke: none; }
-.game-card-name {
-  font: 500 19px/1.2 'Iowan Old Style', 'Songti SC', Georgia, serif;
-  color: #f2e6d0;
-}
-.game-card-players { margin-top: 4px; font-size: 12px; color: #d4a72c; }
-.game-card-tag { margin-top: 8px; font-size: 12.5px; line-height: 1.6; color: #9a8168; }
-.picker-leave { margin-top: 26px; }
-
-/* =========================================================
    斗地主
    布局和德州同源：你在正下方，别人沿上方铺开。
    ========================================================= */
@@ -1838,3 +1619,525 @@ em.ai {
 }
 .catan-result h2 { margin: 0; font: 400 26px/1.2 'Iowan Old Style', 'Songti SC', Georgia, serif; color: #e8c65a; }
 .catan-result .dim { margin: 6px 0 18px; color: #9a8168; font-size: 13px; }
+
+/* =========================================================
+   大厅（2D）
+
+   画风换了一套，和牌桌那边刻意不同。理由：
+   **大厅是"店门口"，牌桌是"牌桌"** —— 前者要亮、要热闹、
+   要一眼看出哪间能进；后者要暗、要专注。跑跑卡丁车和弹弹堂
+   都是这个分工，进房间之前和之后完全是两种明度。
+
+   卡通感靠三件事，不靠贴图：
+   - **粗描边**。所有东西 2.5–3px 的深棕描边，这是卡通的骨架
+   - **下沿**。按钮和面板都有一条实心的深色下沿（box-shadow 0 Npx 0），
+     按下去时整块往下沉。这比阴影模糊更"有厚度"
+   - **饱和但暖**。橙黄为主，和背后那座酒馆是同一族颜色，
+     不至于像换了个产品
+
+   3D 酒馆在背后继续渲染，前面压一层暖色纱 —— 它是背景，不是内容。
+   ========================================================= */
+
+/*
+  这一套皮肤要给三个互不嵌套的根元素用：大厅、进场页、弹窗。
+  **变量必须定义在它们共同的选择器上，不能只挂在 .lb 上** ——
+  第一版就是那样写的，结果进场页拿不到 --ink / --go，
+  卡通描边和按钮下沿全没了，看起来像半成品。
+*/
+.lb, .lb-start, .lb-modal-back {
+  --ink: #3b2416;
+  --board: #fff4e0;
+  --board-2: #ffe8c4;
+  --row: #fffdf7;
+  --row-2: #fff5e4;
+  --go: #ffb02e;
+  --go-2: #f28b1b;
+  --go-lip: #a95c08;
+  --lip: #c9a97f;
+  --muted: #93745a;
+  /*
+    字体栈要存成变量，因为下面到处在用 `font:` 简写。
+    **`font: 800 14px/1 inherit` 是非法的** —— 简写的字体族那一格不接受
+    inherit，整条声明会被整个丢掉。第一版就是这么写的，
+    结果大厅里几十处字重字号全部没生效，标题细得像正文，
+    而浏览器不会报任何错。var() 是在解析之前替换的，所以它可以。
+  */
+  --font: 'Baloo 2', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+  font-family: var(--font);
+}
+
+.lb {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 14px;
+  padding: 16px clamp(16px, 4vw, 56px) clamp(16px, 3vh, 34px);
+  color: var(--ink);
+  /* 背后的 3D 酒馆压一层暖纱。压得够狠，它才退得回背景去 */
+  background:
+    radial-gradient(120% 80% at 50% 0%, #2a170c99 0%, #150c06cc 55%, #0a0603e6 100%);
+  backdrop-filter: blur(7px) saturate(1.25) brightness(0.62);
+  -webkit-backdrop-filter: blur(7px) saturate(1.25) brightness(0.62);
+}
+
+/* ---------- 通用零件 ---------- */
+
+.lb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border: 2.5px solid var(--ink);
+  border-radius: 13px;
+  background: linear-gradient(#fffaf0, #ffeed6);
+  color: var(--ink);
+  font: 800 14px/1 var(--font);
+  letter-spacing: .02em;
+  cursor: pointer;
+  /* 实心下沿 = 厚度。这一条是整套卡通感的来源 */
+  box-shadow: 0 4px 0 var(--lip);
+  transition: transform .08s, box-shadow .08s, filter .12s;
+}
+.lb-btn:hover:not(:disabled) { filter: brightness(1.05); }
+.lb-btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 0 0 var(--lip); }
+.lb-btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: 0 4px 0 var(--lip); }
+
+.lb-btn-go {
+  background: linear-gradient(var(--go), var(--go-2));
+  box-shadow: 0 4px 0 var(--go-lip);
+  color: #3b1d02;
+}
+.lb-btn-go:active:not(:disabled) { box-shadow: 0 0 0 var(--go-lip); }
+.lb-btn-ghost { background: linear-gradient(#fff8ea, #ffefd8); }
+.lb-btn-xl { padding: 14px 40px; font-size: 18px; border-radius: 16px; box-shadow: 0 6px 0 var(--go-lip); }
+.lb-btn-xl:active:not(:disabled) { transform: translateY(6px); }
+.lb-btn.tiny { padding: 6px 13px; font-size: 12.5px; border-radius: 10px; box-shadow: 0 3px 0 var(--go-lip); }
+
+.lb-input {
+  padding: 9px 12px;
+  border: 2.5px solid var(--ink);
+  border-radius: 11px;
+  background: #fffdf7;
+  color: var(--ink);
+  font: 700 14px/1 var(--font);
+  outline: none;
+}
+.lb-input::placeholder { color: #c0a78c; font-weight: 600; }
+.lb-input:focus { box-shadow: 0 0 0 3px #ffb02e66; }
+.lb-input.short { width: 120px; }
+
+/* ---------- 进场页 ---------- */
+
+.lb-start {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(100% 70% at 50% 40%, #2a170c88 0%, #0a0603dd 100%);
+  cursor: pointer;
+}
+.lb-start-card { text-align: center; }
+.lb-logo-main {
+  display: block;
+  font: 900 clamp(44px, 8vw, 76px)/1 var(--font);
+  letter-spacing: .12em;
+  color: #ffd27a;
+  /* 描边 + 下沿：卡通标题的标准做法，一层文字阴影堆出来 */
+  text-shadow:
+    3px 0 0 #3b2416, -3px 0 0 #3b2416, 0 3px 0 #3b2416, 0 -3px 0 #3b2416,
+    2px 2px 0 #3b2416, -2px 2px 0 #3b2416, 2px -2px 0 #3b2416, -2px -2px 0 #3b2416,
+    0 10px 0 #7a3f10, 0 18px 32px #000a;
+}
+.lb-logo-sub {
+  display: block;
+  margin-top: 14px;
+  font: 800 15px/1 var(--font);
+  letter-spacing: .5em;
+  text-indent: .5em;
+  color: #e8b477;
+}
+.lb-start-desc {
+  margin: 26px 0 28px;
+  font: 700 15px/1.9 var(--font);
+  color: #f0dcc0;
+  text-shadow: 0 2px 6px #000a;
+}
+.lb-start-note { margin-top: 18px; font: 700 12px/1 var(--font); color: #a8886a; }
+
+/* ---------- 顶栏 ---------- */
+
+.lb-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 1240px;
+  justify-self: center;
+}
+.lb-logo.small .lb-logo-main { font-size: 27px; letter-spacing: .1em; }
+.lb-logo.small .lb-logo-main {
+  text-shadow:
+    2px 0 0 #3b2416, -2px 0 0 #3b2416, 0 2px 0 #3b2416, 0 -2px 0 #3b2416,
+    0 5px 0 #7a3f10;
+}
+.lb-logo.small .lb-logo-sub { margin-top: 5px; font-size: 10.5px; letter-spacing: .34em; }
+
+.lb-me {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 14px 6px 7px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: linear-gradient(#fff8ea, #ffecd0);
+  box-shadow: 0 4px 0 var(--lip);
+}
+.lb-me-av {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid var(--ink);
+  background: linear-gradient(#ffcf6e, #e2743a);
+}
+.lb-me-name { font: 800 14px/1 var(--font); }
+
+/* ---------- 主面板 ---------- */
+
+.lb-board {
+  position: relative;
+  /* 超宽屏上不让面板摊成一条 —— 一行太长，眼睛从房号扫到按钮要跨半米 */
+  width: 100%;
+  max-width: 1240px;
+  justify-self: center;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px;
+  border: 3px solid var(--ink);
+  border-radius: 22px;
+  background: linear-gradient(var(--board), var(--board-2));
+  box-shadow: 0 10px 0 #3b241659, 0 30px 70px #000a;
+}
+/* 内圈亮边。板子有厚度，边缘会有一道高光 —— 少了它就是个方框 */
+.lb-board::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 2px solid #ffffff9c;
+  border-radius: 16px;
+  pointer-events: none;
+}
+
+/* ---------- 标签页与工具条 ---------- */
+
+.lb-tabs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lb-tab {
+  --accent: #8a6a4a;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 15px;
+  border: 2.5px solid var(--ink);
+  border-radius: 12px 12px 4px 4px;
+  background: #f3e2c6;
+  color: #7b5c3f;
+  font: 800 14px/1 var(--font);
+  cursor: pointer;
+  transition: transform .1s, background .12s, color .12s;
+}
+.lb-tab:hover { transform: translateY(-1px); }
+.lb-tab.on {
+  background: var(--accent);
+  color: #fff8e8;
+  transform: translateY(-2px);
+  box-shadow: 0 3px 0 #00000038;
+}
+
+.lb-tools { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.lb-search { width: 150px; padding: 8px 12px; }
+
+/* ---------- 房间行 ---------- */
+
+.lb-rows {
+  display: flex;
+  flex-direction: column;
+  align-content: start;
+  gap: 7px;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 2px;
+}
+.lb-empty { padding: 60px 0; text-align: center; font: 800 15px/1 var(--font); color: var(--muted); }
+
+.lb-row {
+  --accent: #8a6a4a;
+  position: relative;
+  display: grid;
+  grid-template-columns: 62px 130px minmax(0, 1fr) 128px 74px 82px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 0 22px;
+  height: 56px;
+  border: 2.5px solid var(--ink);
+  border-radius: 14px;
+  background: var(--row);
+  box-shadow: 0 3px 0 #3b24162e;
+  cursor: pointer;
+  transition: transform .1s, box-shadow .1s, background .12s;
+}
+/* 左端的色条 = 这一行打什么。玩家扫列表时先看到的就是它 */
+.lb-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 11px;
+  border-radius: 11px 0 0 11px;
+  background: var(--accent);
+  border-right: 2.5px solid var(--ink);
+}
+.lb-row:hover:not(.closed) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 #3b241640;
+  background: #fffef9;
+}
+.lb-row.closed {
+  cursor: default;
+  background: var(--row-2);
+  box-shadow: none;
+  /* 进不去的房间要退后，但**不能把游戏色也退掉** ——
+     "按颜色扫"这件事对满员的房间同样成立 */
+  filter: saturate(.7);
+  opacity: .82;
+}
+
+.lb-no { font: 800 16px/1 var(--font); color: #a3835f; letter-spacing: .04em; }
+.lb-game { display: flex; align-items: center; gap: 7px; color: var(--accent); }
+.lb-game-ic {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2.5px solid var(--ink);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--accent);
+}
+.lb-game-name { font: 800 13.5px/1 var(--font); color: var(--ink); }
+.lb-name {
+  font: 800 15px/1.3 var(--font);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-lock { margin-right: 5px; font-size: 12px; }
+
+/* 人数画成点阵。满没满是一眼的事，不该让人做减法 */
+.lb-seats { display: flex; align-items: center; gap: 4px; }
+.lb-seats i {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: #fff;
+}
+.lb-seats i.on { background: var(--accent); }
+.lb-seats-n { margin-left: 6px; font: 800 12.5px/1 var(--font); color: var(--muted); }
+
+.lb-status {
+  justify-self: start;
+  padding: 4px 9px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  font: 800 11.5px/1.4 var(--font);
+}
+.lb-status.waiting { background: #7fc98a; color: #14361a; }
+.lb-status.playing { background: #d8c8b0; color: #4a3a28; }
+.lb-status.full { background: #e8a06a; color: #3d1f08; }
+
+.lb-enter { justify-self: end; }
+
+/* ---------- 翻页 ---------- */
+
+.lb-pager { display: flex; align-items: center; gap: 10px; }
+.lb-pageno { font: 800 14px/1 var(--font); min-width: 54px; text-align: center; }
+.lb-count { margin-left: auto; font: 700 12.5px/1 var(--font); color: var(--muted); }
+
+/* ---------- 弹窗 ---------- */
+
+.lb-modal-back {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: #0a060399;
+  backdrop-filter: blur(3px);
+}
+.lb-modal {
+  --ink: #3b2416;
+  --lip: #c9a97f;
+  --go: #ffb02e;
+  --go-2: #f28b1b;
+  --go-lip: #a95c08;
+  width: min(560px, 92vw);
+  padding: 22px 24px 20px;
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  background: linear-gradient(#fff4e0, #ffe8c4);
+  box-shadow: 0 10px 0 #3b241659, 0 30px 70px #000b;
+  color: var(--ink);
+}
+.lb-modal.small { width: min(380px, 92vw); }
+.lb-modal h3 { margin: 0 0 16px; font: 900 21px/1 var(--font); }
+.lb-field { margin-bottom: 16px; }
+.lb-field.row { display: flex; align-items: center; gap: 12px; }
+.lb-field label { display: block; margin-bottom: 7px; font: 800 12.5px/1 var(--font); color: var(--muted); }
+.lb-field.row label { margin-bottom: 0; }
+.lb-tagline { margin: 9px 0 0; font: 700 12.5px/1.7 var(--font); color: var(--muted); }
+.lb-check { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.lb-check input { width: 17px; height: 17px; accent-color: #f28b1b; }
+.lb-check span { font: 800 13.5px/1 var(--font); color: var(--ink); }
+.lb-err { margin-top: 9px; font: 800 12.5px/1 var(--font); color: #c8412f; }
+.lb-modal-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+.lb-gamepick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.lb-gamecard {
+  --accent: #8a6a4a;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 14px 8px 11px;
+  border: 2.5px solid var(--ink);
+  border-radius: 14px;
+  background: #fffdf7;
+  color: var(--ink);
+  font-family: var(--font);
+  cursor: pointer;
+  box-shadow: 0 3px 0 #3b24162e;
+  transition: transform .1s, background .12s;
+}
+.lb-gamecard .ic { color: var(--accent); }
+.lb-gamecard b { font: 800 14.5px/1 var(--font); }
+.lb-gamecard em { font: 700 11.5px/1 var(--font); font-style: normal; color: var(--muted); }
+.lb-gamecard:hover { transform: translateY(-2px); }
+.lb-gamecard.on {
+  background: var(--accent);
+  color: #fff8e8;
+  box-shadow: 0 3px 0 #00000042;
+}
+.lb-gamecard.on .ic, .lb-gamecard.on em { color: #fff8e8; }
+
+/* ---------- 房间里 ---------- */
+
+/* 房间里内容少，面板不该被拉到满屏高 —— 一大片空奶油色比留白更像 bug */
+.lb-room .lb-board {
+  grid-template-rows: 1fr auto;
+  align-self: center;
+  height: min(520px, 100%);
+}
+.lb-roomtitle { display: flex; align-items: center; gap: 9px; font: 900 20px/1 var(--font); color: #ffe6bd; text-shadow: 0 2px 0 #3b2416, 0 6px 14px #000a; }
+.lb-roomno {
+  padding: 3px 9px;
+  border: 2.5px solid #3b2416;
+  border-radius: 9px;
+  background: #ffd27a;
+  color: #3b2416;
+  font-size: 14px;
+  text-shadow: none;
+}
+.lb-roomgame {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 2.5px solid #3b2416;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff8e8;
+  font: 800 14px/1 var(--font);
+  box-shadow: 0 4px 0 #00000045;
+}
+
+.lb-seatgrid {
+  display: grid;
+  /* 座位卡固定宽度并居中，不铺满 —— 三四张卡拉成一整排会散架，
+     而且中间空出一大片奶油色，看着像没加载完 */
+  grid-template-columns: repeat(auto-fit, 196px);
+  justify-content: center;
+  align-content: center;
+  gap: 16px;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 4px;
+}
+.lb-seat {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  padding: 26px 12px 20px;
+  border: 2.5px solid var(--ink);
+  border-radius: 16px;
+  background: var(--row);
+  box-shadow: 0 3px 0 #3b24162e;
+}
+/* 空位画成虚线而不是藏起来 —— "还差两个人"是这一屏最重要的信息 */
+.lb-seat.empty { border-style: dashed; background: #00000008; box-shadow: none; opacity: .78; }
+.lb-seat.me { border-color: #f28b1b; box-shadow: 0 3px 0 #f28b1b66; }
+.lb-seat-av {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 2.5px solid var(--ink);
+  background: #e7d6bd;
+}
+.lb-seat b { display: flex; align-items: center; gap: 6px; font: 800 16px/1 var(--font); }
+.lb-seat em { font: 700 11.5px/1 var(--font); font-style: normal; color: var(--muted); }
+.lb-hostbadge {
+  padding: 2px 6px;
+  border: 2px solid var(--ink);
+  border-radius: 7px;
+  background: #ffd27a;
+  font: 800 10px/1.3 var(--font);
+}
+
+.lb-roomfoot { display: flex; align-items: center; gap: 16px; }
+.lb-roomactions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.lb-roomhint { font: 800 13px/1 var(--font); color: var(--muted); }
+
+/* ---------- 提示条 ---------- */
+
+.lb-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 42px;
+  z-index: 60;
+  transform: translateX(-50%);
+  padding: 11px 22px;
+  border: 2.5px solid #3b2416;
+  border-radius: 13px;
+  background: #ffd27a;
+  color: #3b2416;
+  font: 800 14px/1 'Baloo 2', 'PingFang SC', system-ui, sans-serif;
+  box-shadow: 0 5px 0 #a95c08, 0 14px 30px #0009;
+  animation: lb-toast 2.4s ease forwards;
+}
+@keyframes lb-toast {
+  0% { opacity: 0; transform: translate(-50%, 12px); }
+  12%, 78% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -8px); }
+}
+
+@media (max-width: 860px) {
+  .lb-row { grid-template-columns: 52px 40px minmax(0, 1fr) 60px; height: 52px; }
+  .lb-game-name, .lb-seats i, .lb-status { display: none; }
+  .lb-seats-n { margin-left: 0; }
+}

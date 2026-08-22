@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { usePlayerStore } from '../../state/usePlayerStore'
+import { useLobby } from '../../lobby/useLobby'
 import { useRoster } from '../../games/seats'
 import { RESOURCES, RESOURCE_NAMES, type Resource } from '../../catan/board'
 import { startCatanSession } from '../../catan/session'
@@ -19,8 +19,8 @@ import { CatanBoard } from './CatanBoard'
  * 界面自己不判断任何一条规则，也就不可能和引擎判得不一样。
  */
 export function CatanTable() {
-  const stand = usePlayerStore((s) => s.beginStand)
-  const back = usePlayerStore((s) => s.chooseGame)
+  const back = useLobby((s) => s.endGame)
+  const stand = useLobby((s) => s.leave)
   const roster = useRoster(4)
 
   const view = useCatan((s) => s.view)
@@ -87,7 +87,7 @@ export function CatanTable() {
   if (!view) {
     return (
       <div className="catan">
-        <Top turnNo={0} onBack={() => back(null)} onStand={stand} />
+        <Top turnNo={0} onBack={back} onStand={stand} />
         <div className="catan-loading">正在铺棋盘…</div>
       </div>
     )
@@ -101,7 +101,7 @@ export function CatanTable() {
 
   return (
     <div className="catan">
-      <Top turnNo={view.turnNo} onBack={() => back(null)} onStand={stand} />
+      <Top turnNo={view.turnNo} onBack={back} onStand={stand} />
 
       <div className="catan-body">
         <div className="catan-stage">
@@ -255,8 +255,8 @@ export function CatanTable() {
           <div className="card">
             <h2>{result.seat === view.me ? '你赢了' : `${view.players.find((p) => p.seat === result.seat)?.name} 赢了`}</h2>
             <p className="dim">{result.vp} 分</p>
-            <button className="primary-btn" onClick={() => back(null)}>
-              回到选择
+            <button className="primary-btn" onClick={back}>
+              回房间
             </button>
           </div>
         </div>
@@ -275,10 +275,10 @@ function Top({ turnNo, onBack, onStand }: { turnNo: number; onBack: () => void; 
       </div>
       <div className="tools">
         <button className="ghost-btn" onClick={onBack}>
-          换游戏
+          回房间
         </button>
         <button className="ghost-btn" onClick={onStand}>
-          起身
+          离开
         </button>
       </div>
     </header>
