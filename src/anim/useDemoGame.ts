@@ -14,6 +14,13 @@ import type { GameEvent } from '../game/types'
  */
 export function useDemoGame(enabled: boolean, playerCount = 5, intervalMs = 1600) {
   const [events, setEvents] = useState<GameEvent[]>([])
+  /**
+   * 这个假事件源跑的是阿瓦隆，而阿瓦隆最少 5 人。
+   * 大厅里有四把椅子的桌子，直接把椅子数传进来会抛「不支持 4 人局」——
+   * 坐下去控制台就红一片。这里夹一下：
+   * 环境动画只是让场景里有人在动，几个人无所谓。
+   */
+  const count = Math.min(10, Math.max(5, playerCount))
 
   useEffect(() => {
     if (!enabled) {
@@ -26,7 +33,7 @@ export function useDemoGame(enabled: boolean, playerCount = 5, intervalMs = 1600
     ;(async () => {
       const r = await runGame(
         {
-          playerCount,
+          playerCount: count,
           optionalRoles: ['percival', 'morgana'],
           seed: Date.now() % 9973,
         },
@@ -49,7 +56,7 @@ export function useDemoGame(enabled: boolean, playerCount = 5, intervalMs = 1600
       cancelled = true
       if (timer) clearInterval(timer)
     }
-  }, [enabled, playerCount, intervalMs])
+  }, [enabled, count, intervalMs])
 
   return events
 }

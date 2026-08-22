@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import * as THREE from 'three'
 import { Scene } from './scene/Scene'
 import { Hud } from './ui/Hud'
-import { PokerTable } from './ui/poker/PokerTable'
+import { SeatedOverlay } from './ui/SeatedOverlay'
 
 export default function App() {
   return (
@@ -31,11 +31,11 @@ export default function App() {
       <Leva hidden={!import.meta.env.DEV} />
       <Hud />
       {/*
-        牌桌界面盖在 3D 上面，而不是替换掉它。
+        游戏界面盖在 3D 上面，而不是替换掉它。
         3D 继续渲染是有意的：离席时能直接切回大厅，不用重建整个场景；
-        将来摊牌要切回 3D 桌上，也只是把这一层淡出。
+        换游戏也只是换这一层里挂的是谁。
       */}
-      <PokerTable />
+      <SeatedOverlay />
     </>
   )
 }

@@ -1239,3 +1239,602 @@ em.ai {
 }
 .sheet footer p { margin: 0 0 8px; color: #9c8467; font: 13px/1.7 system-ui; }
 .sheet footer b { color: #d4a72c; }
+
+/* =========================================================
+   选择面板
+   落座后的第一屏。背后的 3D 酒馆继续透出来 ——
+   这一层是"桌上摆着的几个盒子"，不是另一个页面。
+   ========================================================= */
+
+.picker {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  color: #e9dcc9;
+  background: radial-gradient(120% 80% at 50% 0%, #3a241355 0%, #180f0899 50%, #060403cc 100%);
+  backdrop-filter: blur(20px) saturate(1.3) brightness(0.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3) brightness(0.8);
+}
+.picker-inner { width: min(880px, 92vw); text-align: center; }
+.picker-head .brand {
+  font: 600 13px/1 system-ui;
+  letter-spacing: .34em;
+  color: #d4a72c;
+}
+.picker-head h1 {
+  margin: 14px 0 6px;
+  font: 400 30px/1.2 'Iowan Old Style', 'Songti SC', Georgia, serif;
+  color: #f2e6d0;
+}
+.picker-head .dim { margin: 0 0 26px; color: #8a7159; font-size: 13px; }
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 700px) { .picker-grid { grid-template-columns: 1fr; } }
+
+.game-card {
+  display: block;
+  padding: 20px 18px 18px;
+  text-align: left;
+  border: 1px solid #3a2a1e;
+  border-radius: 10px;
+  background: linear-gradient(#1b120bcc, #120c08cc);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .16s, background .16s, transform .16s;
+}
+.game-card:hover:not(:disabled) {
+  border-color: #7a5a2e;
+  background: linear-gradient(#241708e6, #170e08e6);
+  transform: translateY(-2px);
+}
+.game-card:disabled { opacity: .4; cursor: not-allowed; }
+
+.game-card-art { height: 54px; margin-bottom: 14px; }
+.game-card-art svg {
+  width: 54px;
+  height: 54px;
+  stroke: #d4a72c;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.game-card-art .fill { fill: #d4a72c; stroke: none; }
+.game-card-name {
+  font: 500 19px/1.2 'Iowan Old Style', 'Songti SC', Georgia, serif;
+  color: #f2e6d0;
+}
+.game-card-players { margin-top: 4px; font-size: 12px; color: #d4a72c; }
+.game-card-tag { margin-top: 8px; font-size: 12.5px; line-height: 1.6; color: #9a8168; }
+.picker-leave { margin-top: 26px; }
+
+/* =========================================================
+   斗地主
+   布局和德州同源：你在正下方，别人沿上方铺开。
+   ========================================================= */
+
+.ddz {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  color: #e9dcc9;
+  font: 14px/1.5 'Iowan Old Style', 'Songti SC', Georgia, 'PingFang SC', serif;
+  background: radial-gradient(130% 80% at 50% -10%, #3a241366 0%, #180f0899 44%, #060403cc 100%);
+  backdrop-filter: blur(26px) saturate(1.4) brightness(0.85);
+  -webkit-backdrop-filter: blur(26px) saturate(1.4) brightness(0.85);
+}
+/* 和德州那边同一层颗粒。两个游戏的"材质"必须一致，否则切换时像换了软件 */
+.ddz::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: .16;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.ddz-top {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 20px;
+  background: linear-gradient(#160f0a, #120c08);
+  border-bottom: 1px solid #34241a;
+  box-shadow: 0 6px 22px #0007;
+}
+.ddz-top .brand { font: 600 13px/1 system-ui; letter-spacing: .34em; color: #d4a72c; }
+.ddz-top .meta { display: flex; gap: 12px; align-items: baseline; }
+.ddz-top .meta .dim { color: #8a7159; font-size: 13px; }
+.ddz-top .tools { display: flex; gap: 8px; margin-left: 10px; }
+.ddz-top .playmoney {
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid #3a2a1e;
+  border-radius: 5px;
+  color: #7d6752;
+  font: 12px/1.4 system-ui;
+}
+
+.ddz-loading { display: grid; place-items: center; color: #8a7159; }
+
+.ddz-body { display: grid; grid-template-columns: 1fr 250px; min-height: 0; }
+
+.ddz-felt { position: relative; margin: 16px 14px 4px 20px; }
+
+.ddz-bottom-cards {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ddz-bottom-cards .label { font-size: 12px; color: #7d6752; letter-spacing: .1em; }
+
+.cardrow { position: relative; height: 0; }
+.cardrow-slot { position: absolute; top: 0; }
+.cardrow[style] { height: auto; }
+.cardrow > .cardrow-slot:first-child { position: relative; left: 0 !important; }
+
+.ddz-opp {
+  position: absolute;
+  /* 压到竖直中段：牌桌的戏在中间，两家贴着天花板会让屏幕中央空一大块 */
+  top: 34%;
+  width: 210px;
+  padding: 10px 12px;
+  border: 1px solid #2a1e15;
+  border-radius: 10px;
+  background: #14100bb0;
+  transition: border-color .2s, box-shadow .2s;
+}
+.ddz-opp.left { left: 8px; }
+.ddz-opp.right { right: 8px; }
+/* 轮到谁，边框亮起来。三家轮转很快，没有这个就跟丢了 */
+.ddz-opp.turn { border-color: #7a5a2e; box-shadow: 0 0 0 1px #d4a72c33, 0 0 22px #d4a72c1f; }
+
+.ddz-opp .who { display: flex; align-items: center; gap: 10px; }
+.ddz-opp .name { font-size: 14px; color: #e6d6bb; display: flex; align-items: center; gap: 6px; }
+.lordbadge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #3a2a08;
+  color: #e8c65a;
+  font: 600 10px/1.6 system-ui;
+}
+.ddz-opp .left {
+  font: 600 13px/1.4 system-ui;
+  color: #9a8168;
+}
+/* 剩三张以内就变红。这是斗地主的心跳 */
+.ddz-opp .left.hot { color: #e8785a; }
+.ddz-opp .played { margin-top: 12px; min-height: 40px; }
+.ddz-opp .thinking { color: #6d5a45; letter-spacing: .3em; }
+
+.pass-mark {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px dashed #4a3728;
+  border-radius: 5px;
+  color: #7d6752;
+  font-size: 12px;
+}
+
+.ddz-mine-played {
+  position: absolute;
+  bottom: 4%;
+  left: 50%;
+  transform: translateX(-50%);
+  min-height: 52px;
+}
+.ddz-req {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: #9a8168;
+}
+.ddz-req b { color: #e8c65a; font-weight: 600; }
+
+.ddz-log {
+  margin: 16px 16px 4px 0;
+  padding: 10px 12px;
+  overflow-y: auto;
+  border: 1px solid #241a12;
+  border-radius: 8px;
+  background: #0f0b07a8;
+  font: 12.5px/1.75 system-ui;
+  color: #8a7159;
+}
+.ddz-log .row.system { color: #6d5a45; }
+.ddz-log .row.result { color: #e8c65a; }
+
+.ddz-foot {
+  padding: 0 20px 14px;
+  background: linear-gradient(#0000, #0b0705cc 40%);
+}
+
+/* 手牌。同点数挤在一起、换点数留缝 —— 结构靠这个看出来 */
+.ddz-hand {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  min-height: 96px;
+  padding-top: 12px;
+}
+.hand-slot { transition: transform .12s; }
+/* 自己那一栏：地主徽记 + 剩几张，和对家用同一套写法 */
+.ddz-me {
+  position: absolute;
+  left: 20px;
+  bottom: 96px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ddz-me .name { font-size: 14px; color: #e6d6bb; display: flex; align-items: center; gap: 6px; }
+.ddz-me .left { font: 600 13px/1.4 system-ui; color: #9a8168; }
+.ddz-me .left.hot { color: #e8785a; }
+.ddzcard.clickable { cursor: pointer; }
+.ddzcard.sel { transform: translateY(-16px); box-shadow: 0 0 0 2px #d4a72c, 0 8px 16px #0009; }
+/* 10 是两位数，角标要缩一号，不然会顶出牌面 */
+.ddzcard.wide .corner b { font-size: .82em; letter-spacing: -.04em; }
+.ddzcard .pip { opacity: .3; font-size: 60%; }
+.ddzcard.joker { color: #b0342a; }
+.ddzcard.joker .pip { opacity: .22; }
+
+.ddz-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.ddz-actions .prompt { color: #9a8168; }
+.ddz-actions .prompt.dim { color: #6d5a45; }
+.ddz-actions .picked { margin-left: 6px; font-size: 13px; color: #9a8168; }
+.primary-btn {
+  padding: 7px 20px;
+  border: 1px solid #7a5a2e;
+  border-radius: 6px;
+  background: linear-gradient(#3a2a10, #241708);
+  color: #f2dfae;
+  font: 500 14px/1 system-ui;
+  cursor: pointer;
+  transition: filter .15s;
+}
+.primary-btn:hover:not(:disabled) { filter: brightness(1.25); }
+.primary-btn:disabled, .ghost-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+.ddz-scores {
+  margin-left: auto;
+  display: flex;
+  gap: 14px;
+  font: 12.5px/1 system-ui;
+  color: #7d6752;
+}
+.ddz-scores .me { color: #d4a72c; }
+
+.ddz-result {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: #06040399;
+  backdrop-filter: blur(4px);
+}
+.ddz-result .card {
+  width: min(420px, 90vw);
+  padding: 26px 28px 22px;
+  text-align: center;
+  border: 1px solid #45311f;
+  border-radius: 12px;
+  background: linear-gradient(#1b120b, #120c08);
+  box-shadow: 0 24px 60px #000a;
+}
+.ddz-result h2 { margin: 0; font: 400 26px/1.2 'Iowan Old Style', 'Songti SC', Georgia, serif; }
+.ddz-result h2.lord { color: #e8c65a; }
+.ddz-result h2.farmer { color: #8fd08f; }
+.ddz-result .mult { margin: 6px 0 18px; color: #9a8168; font-size: 13px; }
+.ddz-result .mult em { color: #e8785a; font-style: normal; font-weight: 600; }
+.ddz-result .reveal { text-align: left; margin-bottom: 20px; }
+.ddz-result .rrow {
+  display: grid;
+  grid-template-columns: 84px 52px 1fr;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid #241a12;
+  font: 12.5px/1.6 system-ui;
+}
+.ddz-result .rname { color: #cbb08a; }
+.ddz-result .rdelta.up { color: #8fd08f; }
+.ddz-result .rdelta.down { color: #e8785a; }
+.ddz-result .rcards { color: #7d6752; }
+
+/* =========================================================
+   卡坦岛
+   和前两个游戏同一套 art direction：暖琥珀、暗木、颗粒、
+   背后的 3D 酒馆透出来。棋盘本身是桌上摊开的一块板子。
+   ========================================================= */
+
+.catan {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  color: #e9dcc9;
+  font: 14px/1.5 'Iowan Old Style', 'Songti SC', Georgia, 'PingFang SC', serif;
+  background: radial-gradient(130% 80% at 50% -10%, #3a241366 0%, #180f0899 44%, #060403cc 100%);
+  backdrop-filter: blur(26px) saturate(1.4) brightness(0.85);
+  -webkit-backdrop-filter: blur(26px) saturate(1.4) brightness(0.85);
+}
+.catan::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: .14;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.catan-top {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 20px;
+  background: linear-gradient(#160f0a, #120c08);
+  border-bottom: 1px solid #34241a;
+  box-shadow: 0 6px 22px #0007;
+}
+.catan-top .brand { font: 600 13px/1 system-ui; letter-spacing: .34em; color: #d4a72c; }
+.catan-top .meta { display: flex; gap: 12px; align-items: baseline; }
+.catan-top .meta .dim { color: #8a7159; font-size: 13px; }
+.catan-top .tools { display: flex; gap: 8px; margin-left: auto; }
+
+.catan-loading { display: grid; place-items: center; color: #8a7159; }
+
+.catan-body { display: grid; grid-template-columns: 1fr 268px; min-height: 0; }
+.catan-stage { position: relative; display: grid; place-items: center; min-height: 0; padding: 10px; }
+
+.catan-board { width: 100%; height: 100%; max-height: 100%; }
+
+/* ---------- 棋盘元素 ---------- */
+
+.catan-hex polygon {
+  stroke: #0b0806;
+  stroke-width: 2;
+}
+.catan-hex.pickable { cursor: pointer; }
+.catan-hex.pickable polygon { stroke: #e8c65a; stroke-width: 3; }
+
+.numtoken { fill: #f0e6d0; stroke: #00000055; stroke-width: 1; }
+.numlabel { font: 700 15px/1 system-ui; fill: #241708; }
+.numlabel.red { fill: #ad2b21; }
+/* 点数印在数字下面，和真板子一样。6 和 8 的五个点是玩家真正在看的东西 */
+.pips { font: 700 11px/1 system-ui; fill: #6b5a3e; letter-spacing: 1px; }
+.desert-label { font: 500 12px/1 system-ui; fill: #6a5c3f; }
+
+.catan-portmark text { font: 600 10px/1 system-ui; fill: #cfe3ec; }
+.catan-portmark line { stroke: #6f95a5; stroke-width: 1.4; stroke-dasharray: 3 3; opacity: .6; }
+
+.robber ellipse { fill: #00000055; }
+.robber path { fill: #1a1614; stroke: #cbb08a; stroke-width: 1.4; }
+
+.catan-road {
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+/* 底衬：让任何玩家色在任何地块色上都看得见 */
+.catan-road.casing { stroke: #0b0806; stroke-width: 12; opacity: .85; }
+.catan-road.ghost { stroke: #e8c65a; opacity: .28; stroke-dasharray: 6 7; }
+.catan-road.pickable { cursor: pointer; stroke-width: 9; opacity: .55; }
+.catan-road.pickable:hover { opacity: 1; }
+
+.catan-vertex .bldg {
+  stroke: #0b0806;
+  stroke-width: 3;
+  paint-order: stroke;
+  filter: drop-shadow(0 1px 2px #0009);
+}
+.catan-vertex .spot {
+  fill: #e8c65a;
+  opacity: .62;
+  stroke: #fff6dd;
+  stroke-width: 1.5;
+}
+.catan-vertex.pickable { cursor: pointer; }
+.catan-vertex.pickable:hover .spot { opacity: 1; }
+
+.catan-dice {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 8px;
+  animation: dice-pop .45s ease-out;
+}
+.catan-dice span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: linear-gradient(#faf6ee, #e6ddcb);
+  color: #241708;
+  font: 700 19px/1 system-ui;
+  box-shadow: 0 4px 12px #0008;
+}
+@keyframes dice-pop {
+  from { transform: translateY(-8px) scale(.8); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.catan-victims {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #45311f;
+  border-radius: 8px;
+  background: #14100be6;
+}
+
+/* ---------- 右栏 ---------- */
+
+.catan-side { display: grid; grid-template-rows: auto 1fr; gap: 10px; padding: 12px 14px 6px 0; min-height: 0; }
+
+.catan-players { display: flex; flex-direction: column; gap: 6px; }
+.crow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid #241a12;
+  border-radius: 8px;
+  background: #0f0b07a8;
+}
+.crow.turn { border-color: #7a5a2e; box-shadow: 0 0 0 1px #d4a72c26; }
+.crow.thinking .cname::after { content: ' …'; color: #6d5a45; }
+.cinfo { min-width: 0; flex: 1; }
+.cname { display: flex; align-items: center; gap: 5px; font-size: 13.5px; color: #e6d6bb; }
+.cstats { font: 11.5px/1.5 system-ui; color: #7d6752; }
+.cvp {
+  font: 700 18px/1 system-ui;
+  color: #e8c65a;
+  min-width: 22px;
+  text-align: right;
+}
+.badge { padding: 1px 5px; border-radius: 4px; font: 600 9.5px/1.6 system-ui; }
+.badge.road { background: #10303f; color: #7fc4e8; }
+.badge.army { background: #3d1210; color: #f0a89c; }
+
+.catan-log {
+  padding: 10px 12px;
+  overflow-y: auto;
+  border: 1px solid #241a12;
+  border-radius: 8px;
+  background: #0f0b07a8;
+  font: 12.5px/1.7 system-ui;
+  color: #8a7159;
+  min-height: 0;
+}
+.catan-log .row.system { color: #6d5a45; }
+.catan-log .row.result { color: #e8c65a; }
+
+/* ---------- 底栏 ---------- */
+
+.catan-foot {
+  padding: 8px 20px 12px;
+  background: linear-gradient(#0000, #0b0705dd 40%);
+}
+
+.catan-hand { display: flex; gap: 8px; flex-wrap: wrap; }
+.res {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid #3a2a1e;
+  border-radius: 7px;
+  background: #14100b;
+}
+.res b { font: 500 12px/1 system-ui; color: #9a8168; }
+.res span { font: 700 16px/1 system-ui; color: #f2e6d0; }
+.res.zero span { color: #4d4136; }
+/* 五种资源各给一点自己的颜色，扫一眼就知道缺什么 */
+.res.brick  { border-color: #6b3520; }
+.res.lumber { border-color: #26492f; }
+.res.wool   { border-color: #4f6130; }
+.res.grain  { border-color: #6d5a16; }
+.res.ore    { border-color: #3f434b; }
+.res.dev    { border-color: #3d2f52; }
+.res.vp     { margin-left: auto; border-color: #7a5a2e; }
+.res.vp span { color: #e8c65a; }
+
+.catan-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.catan-actions .prompt { color: #9a8168; }
+.catan-actions .prompt.dim { color: #6d5a45; }
+.catan-actions .prompt b { color: #e8785a; }
+.catan-actions .hintline { color: #e8c65a; font-size: 13px; }
+.ghost-btn.on { border-color: #d4a72c; color: #f7e9c4; background: #2e1d09; }
+.ghost-btn.tiny { padding: 3px 8px; font-size: 12px; }
+
+.discard-pick { display: flex; align-items: center; gap: 5px; }
+.discard-pick .dl { font: 12px/1 system-ui; color: #9a8168; min-width: 56px; text-align: center; }
+
+.catan-sheet {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  margin-bottom: 10px;
+  width: min(620px, 90vw);
+  padding: 12px 14px;
+  border: 1px solid #45311f;
+  border-radius: 9px;
+  background: #14100bf2;
+  box-shadow: 0 -12px 34px #0009;
+}
+.sheet-title { margin-bottom: 8px; font-size: 13px; color: #cbb08a; }
+.sheet-title em { color: #8a7159; font-style: normal; font-size: 12px; }
+.traderow, .devrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  border-top: 1px solid #241a12;
+}
+.traderow .tl, .devrow .dl { min-width: 150px; font: 12.5px/1.5 system-ui; color: #9a8168; }
+.catan-sheet .dim { color: #6d5a45; font-size: 12px; }
+.mini-select {
+  padding: 3px 6px;
+  border: 1px solid #45311f;
+  border-radius: 5px;
+  background: #1b120b;
+  color: #cbb08a;
+  font: 12px/1 system-ui;
+}
+
+.catan-result {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: #06040399;
+  backdrop-filter: blur(4px);
+}
+.catan-result .card {
+  padding: 28px 34px 24px;
+  text-align: center;
+  border: 1px solid #45311f;
+  border-radius: 12px;
+  background: linear-gradient(#1b120b, #120c08);
+  box-shadow: 0 24px 60px #000a;
+}
+.catan-result h2 { margin: 0; font: 400 26px/1.2 'Iowan Old Style', 'Songti SC', Georgia, serif; color: #e8c65a; }
+.catan-result .dim { margin: 6px 0 18px; color: #9a8168; font-size: 13px; }
