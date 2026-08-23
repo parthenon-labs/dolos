@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { getAmp } from '../../audio/amplitudes'
 import { seatFacing, seatLocal } from '../hallLayout'
@@ -19,9 +18,14 @@ import { modelForSeat } from './models'
 import { type RigHandle, makeRigState } from './rig'
 import { registerRig, unregisterRig } from './rigRegistry'
 
-/** 超过这个距离就不显示名牌，否则整个大厅飘满字 */
-const LABEL_DISTANCE = 6.5
-/** 超过这个距离掉到低模。刚好是"看不清五官"的距离 */
+/**
+ * 超过这个距离掉到低模。刚好是"看不清五官"的距离。
+ *
+ * 这里以前还有一个 LABEL_DISTANCE，控制角色头顶的名牌。
+ * 名牌是"你和这些人同桌"时才有意义的东西 —— 大厅改成 2D 之后没人同桌了，
+ * 于是它变成了**漏进画面的 UI**：几个名字飘在背景的酒馆里，
+ * 还带着 AI 徽标。背景该像一幅画，不该像一个开着调试信息的游戏。
+ */
 const LOD_DISTANCE = 7.5
 
 /**
@@ -44,7 +48,6 @@ export function Character({
   const rig = useRef<RigHandle | null>(null)
   const holder = useRef<THREE.Group>(null)
   const state = useMemo(makeRigState, [])
-  const [labelVisible, setLabelVisible] = useState(false)
   const [lod, setLod] = useState<'full' | 'cheap'>('full')
 
   const worldPos = useRef(new THREE.Vector3())
@@ -78,8 +81,6 @@ export function Character({
     holder.current.getWorldPosition(worldPos.current)
     const d = camera.position.distanceTo(worldPos.current)
 
-    const near = d < LABEL_DISTANCE
-    if (near !== labelVisible) setLabelVisible(near)
     // 迟滞：两个阈值差 1 米，否则站在边界上会疯狂来回切换
     const want = d < LOD_DISTANCE ? 'full' : d > LOD_DISTANCE + 1 ? 'cheap' : lod
     if (want !== lod) setLod(want)
@@ -111,7 +112,6 @@ export function Character({
         <ProceduralCharacter ref={attach} color={occupant.color} lod={lod} />
       )}
 
-      {labelVisible && <NameTag occupant={occupant} />}
     </group>
   )
 }
@@ -133,23 +133,3 @@ class RigFallback extends Component<
   }
 }
 
-/**
- * 名牌用 drei 的 <Html>（纯 DOM）而不是 3D 文字：免去字体加载。
- * 不用 distanceFactor —— 那会让名牌跟着透视缩放，
- * 近处玩家的名字会大到糊住半个屏幕。名牌是 HUD，该是恒定屏幕尺寸。
- */
-function NameTag({ occupant }: { occupant: Occupant }) {
-  return (
-    <Html
-      position={[0, 1.6, 0]}
-      center
-      zIndexRange={[10, 0]}
-      style={{ pointerEvents: 'none', userSelect: 'none' }}
-    >
-      <div className="nametag">
-        {occupant.name}
-        {occupant.isAI && <span className="ai-badge">AI</span>}
-      </div>
-    </Html>
-  )
-}

@@ -33,7 +33,7 @@ export default function Backdrop() {
         gl={{
           antialias: false, // 交给 EffectComposer 的 multisampling
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.05,
+          toneMappingExposure: 1.18,
         }}
     >
         <Suspense fallback={null}>

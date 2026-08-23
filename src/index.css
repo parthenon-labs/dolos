@@ -34,20 +34,6 @@ kbd {
   color: #f4e9d6;
 }
 
-/* ---------- 场景内名牌（drei <Html>） ---------- */
-
-.nametag {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: rgba(232, 220, 200, 0.78);
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
-}
-
 /* =========================================================
    对局界面（全屏，盖在 3D 之上）
 
@@ -1659,11 +1645,18 @@ em.ai {
   gap: 14px;
   padding: 16px clamp(16px, 4vw, 56px) clamp(16px, 3vh, 34px);
   color: var(--ink);
-  /* 背后的 3D 酒馆压一层暖纱。压得够狠，它才退得回背景去 */
+  /*
+    背后的 3D 酒馆压一层暖纱。
+    **压多狠是有下限的** —— 第一版压到边缘 90% 的黑加 0.62 的亮度，
+    结果那座酒馆只剩几条轮廓。它是这东西和一个普通网页棋牌室之间
+    唯一的区别，压到看不见等于白养着。
+    现在只压到"不抢戏"为止：列表本身是不透明的奶油板子，
+    可读性靠它，不靠把背景抹黑。
+  */
   background:
-    radial-gradient(120% 80% at 50% 0%, #2a170c99 0%, #150c06cc 55%, #0a0603e6 100%);
-  backdrop-filter: blur(7px) saturate(1.25) brightness(0.62);
-  -webkit-backdrop-filter: blur(7px) saturate(1.25) brightness(0.62);
+    radial-gradient(120% 85% at 50% 0%, #2a170c55 0%, #150c0688 55%, #0a0603bb 100%);
+  backdrop-filter: blur(4px) saturate(1.3) brightness(0.86);
+  -webkit-backdrop-filter: blur(4px) saturate(1.3) brightness(0.86);
 }
 
 /* ---------- 通用零件 ---------- */
@@ -1721,7 +1714,9 @@ em.ai {
   z-index: 45;
   display: grid;
   place-items: center;
-  background: radial-gradient(100% 70% at 50% 40%, #2a170c88 0%, #0a0603dd 100%);
+  /* 进场页背后没有任何面板挡着，所以压得比大厅还轻 ——
+     这一屏是唯一一次能好好看那座酒馆的机会 */
+  background: radial-gradient(100% 70% at 50% 42%, #2a170c55 0%, #0a0603b8 100%);
   cursor: pointer;
 }
 .lb-start-card { text-align: center; }
