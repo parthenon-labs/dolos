@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { sfx } from '../../audio/sfx'
 import { GAMES, gameById, type GameId } from '../../games/registry'
 import { PAGE_SIZE, useLobby, visibleRooms, type Room } from '../../lobby/useLobby'
 import { CreateRoom } from './CreateRoom'
 import { Glyph } from './Glyph'
+import { SoundToggle } from './SoundToggle'
+import { useKeys } from './useKeys'
 
 /**
  * 大厅。
@@ -25,11 +28,28 @@ export function Lobby() {
   const setPage = useLobby((s) => s.setPage)
   const refresh = useLobby((s) => s.refresh)
   const join = useLobby((s) => s.join)
+  const tick = useLobby((s) => s.tick)
+  const quickPlay = useLobby((s) => s.quickPlay)
 
   const [creating, setCreating] = useState(false)
   const [asking, setAsking] = useState<Room | null>(null)
   const [pwd, setPwd] = useState('')
   const [err, setErr] = useState<string | null>(null)
+
+  /**
+   * 让大厅自己动。
+   *
+   * 三秒半一次，动一处。快了会让人眼花（一直有行在跳），
+   * 慢了就回到"这是张截图"的观感。这个数字是看着调的。
+   */
+  useEffect(() => {
+    const t = setInterval(tick, 3500)
+    return () => clearInterval(t)
+  }, [tick])
+
+  useKeys({
+    Escape: creating || asking ? () => (setCreating(false), setAsking(null)) : undefined,
+  })
 
   const list = useMemo(() => visibleRooms(rooms, filter, query), [rooms, filter, query])
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
@@ -47,6 +67,13 @@ export function Lobby() {
     }
     setAsking(null)
     setErr(null)
+    sfx('join')
+  }
+
+  const onQuick = () => {
+    const why = quickPlay()
+    if (why) setErr(why)
+    else sfx('join')
   }
 
   return (
@@ -56,9 +83,12 @@ export function Lobby() {
           <span className="lb-logo-main">DOLOS</span>
           <span className="lb-logo-sub">酒馆棋牌室</span>
         </div>
-        <div className="lb-me">
-          <span className="lb-me-av" />
-          <span className="lb-me-name">你</span>
+        <div className="lb-topright">
+          <SoundToggle />
+          <div className="lb-me">
+            <span className="lb-me-av" />
+            <span className="lb-me-name">你</span>
+          </div>
         </div>
       </header>
 
@@ -91,8 +121,12 @@ export function Lobby() {
             <button className="lb-btn lb-btn-ghost" onClick={refresh}>
               刷新
             </button>
-            <button className="lb-btn lb-btn-go" onClick={() => setCreating(true)}>
+            <button className="lb-btn lb-btn-ghost" onClick={() => setCreating(true)}>
               建房间
+            </button>
+            {/* 最常用的一个按钮，所以它最大、最亮、排在最后（最靠近鼠标常在的一侧）*/}
+            <button className="lb-btn lb-btn-go lb-quick" onClick={onQuick}>
+              快速开始
             </button>
           </div>
         </div>

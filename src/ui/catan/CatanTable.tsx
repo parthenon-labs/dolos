@@ -5,7 +5,16 @@ import { RESOURCES, RESOURCE_NAMES, type Resource } from '../../catan/board'
 import { startCatanSession } from '../../catan/session'
 import { optionsOf, useCatan } from '../../catan/useCatan'
 import { COSTS, VP_TO_WIN } from '../../catan/engine'
-import { DEV_NAMES, emptyHand, handSize, type CatanAction, type DevKind, type Hand, type Seat } from '../../catan/types'
+import {
+  DEV_NAMES,
+  emptyHand,
+  handSize,
+  type CatanAction,
+  type DevKind,
+  type Hand,
+  type Seat,
+  type TradeOffer,
+} from '../../catan/types'
 import { Avatar } from '../match/Avatar'
 import { CatanBoard } from './CatanBoard'
 
@@ -29,10 +38,11 @@ export function CatanTable() {
   const thinking = useCatan((s) => s.thinking)
   const lastRoll = useCatan((s) => s.lastRoll)
   const result = useCatan((s) => s.result)
+  const tradeAsk = useCatan((s) => s.tradeAsk)
 
   /** 界面自己的一个小状态：现在正在"选一条路"还是"选一个路口" */
   const [mode, setMode] = useState<null | 'road' | 'settlement' | 'city'>(null)
-  const [sheet, setSheet] = useState<null | 'trade' | 'dev'>(null)
+  const [sheet, setSheet] = useState<null | 'trade' | 'dev' | 'offer'>(null)
   const [discard, setDiscard] = useState<Hand>(emptyHand())
   const [victims, setVictims] = useState<null | { hex: number; options: Seat[] }>(null)
 
@@ -250,6 +260,16 @@ export function CatanTable() {
         </div>
       </footer>
 
+      {tradeAsk && (
+        <TradeAskPanel
+          key={`${tradeAsk.offer.from}-${JSON.stringify(tradeAsk.offer.give)}`}
+          from={view.players.find((p) => p.seat === tradeAsk.offer.from)?.name ?? ''}
+          offer={tradeAsk.offer}
+          myHand={view.myHand}
+          onAnswer={tradeAsk.resolve}
+        />
+      )}
+
       {result && (
         <div className="catan-result">
           <div className="card">
@@ -359,8 +379,8 @@ function BuildBar({
   opts: CatanAction[]
   mode: null | 'road' | 'settlement' | 'city'
   setMode: (m: null | 'road' | 'settlement' | 'city') => void
-  sheet: null | 'trade' | 'dev'
-  setSheet: (s: null | 'trade' | 'dev') => void
+  sheet: null | 'trade' | 'dev' | 'offer'
+  setSheet: (s: null | 'trade' | 'dev' | 'offer') => void
   hand: Hand
   dev: DevKind[]
   devFresh: number
@@ -414,6 +434,12 @@ function BuildBar({
         买发展卡
       </button>
       <button
+        className={`ghost-btn${sheet === 'offer' ? ' on' : ''}`}
+        onClick={() => setSheet(sheet === 'offer' ? null : 'offer')}
+      >
+        跟人换
+      </button>
+      <button
         className={`ghost-btn${sheet === 'trade' ? ' on' : ''}`}
         disabled={trades.length === 0}
         onClick={() => setSheet(sheet === 'trade' ? null : 'trade')}
@@ -432,6 +458,8 @@ function BuildBar({
       </button>
 
       {mode && <span className="prompt hintline">点棋盘上高亮的位置</span>}
+
+      {sheet === 'offer' && <OfferSheet hand={hand} send={send} />}
 
       {sheet === 'trade' && (
         <div className="catan-sheet">
@@ -499,6 +527,148 @@ function BuildBar({
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * 有人跟你换牌。
+ *
+ * 一屏只问一件事，而且**把"你付什么、你得什么"分两行摆开** ——
+ * 混在一句话里（"用两木换一矿"）玩家要读两遍才知道哪边是自己的。
+ * 右上角是倒计时：不答就当拒绝，这一点必须写在脸上，
+ * 不然超时之后玩家会以为是 bug。
+ */
+function TradeAskPanel({
+  from,
+  offer,
+  myHand,
+  onAnswer,
+}: {
+  from: string
+  offer: TradeOffer
+  myHand: Hand
+  onAnswer: (yes: boolean) => void
+}) {
+  const [left, setLeft] = useState(14)
+  useEffect(() => {
+    const t = setInterval(() => setLeft((n) => Math.max(0, n - 1)), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const afford = RESOURCES.every((r) => myHand[r] >= (offer.want[r] ?? 0))
+
+  return (
+    <div className="catan-ask">
+      <div className="ask-card">
+        <div className="ask-head">
+          <b>{from}</b> 想跟你换
+          <span className="ask-timer">{left}s</span>
+        </div>
+        <div className="ask-rows">
+          <div className="ask-row give">
+            <span className="ask-label">你付出</span>
+            <HandChips hand={offer.want} />
+          </div>
+          <div className="ask-row get">
+            <span className="ask-label">你得到</span>
+            <HandChips hand={offer.give} />
+          </div>
+        </div>
+        <div className="ask-foot">
+          <button className="ghost-btn" onClick={() => onAnswer(false)}>
+            拒绝
+          </button>
+          <button className="primary-btn" disabled={!afford} onClick={() => onAnswer(true)}>
+            {afford ? '换' : '资源不够'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HandChips({ hand }: { hand: Partial<Hand> }) {
+  const items = RESOURCES.filter((r) => (hand[r] ?? 0) > 0)
+  if (items.length === 0) return <span className="dim">无</span>
+  return (
+    <span className="ask-chips">
+      {items.map((r) => (
+        <span key={r} className={`ask-chip ${r}`}>
+          {RESOURCE_NAMES[r]}
+          <b>{hand[r]}</b>
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/**
+ * 我提议跟别人换。
+ *
+ * 只让加减，不让输数字：五种资源两行加减按钮，点几下就好。
+ * **提议按钮在双方都非空之前是灰的** —— 空对空和白送都不是交易，
+ * 引擎那边会拒，与其让它拒不如根本点不下去。
+ */
+function OfferSheet({
+  hand,
+  send,
+}: {
+  hand: Hand
+  send: (a: CatanAction) => void
+}) {
+  const [give, setGive] = useState<Hand>(emptyHand())
+  const [want, setWant] = useState<Hand>(emptyHand())
+  const ok = handSize(give) > 0 && handSize(want) > 0
+
+  const row = (
+    label: string,
+    val: Hand,
+    setVal: (h: Hand) => void,
+    cap: (r: Resource) => number,
+  ) => (
+    <div className="offer-row">
+      <span className="tl">{label}</span>
+      {RESOURCES.map((r) => (
+        <span key={r} className="offer-pick">
+          <button
+            className="ghost-btn tiny"
+            disabled={val[r] === 0}
+            onClick={() => setVal({ ...val, [r]: val[r] - 1 })}
+          >
+            −
+          </button>
+          <span className="dl">
+            {RESOURCE_NAMES[r]} {val[r]}
+          </span>
+          <button
+            className="ghost-btn tiny"
+            disabled={val[r] >= cap(r)}
+            onClick={() => setVal({ ...val, [r]: val[r] + 1 })}
+          >
+            +
+          </button>
+        </span>
+      ))}
+    </div>
+  )
+
+  return (
+    <div className="catan-sheet wide">
+      <div className="sheet-title">
+        跟人换牌<em>　一换一比银行划算得多，先问人再找银行</em>
+      </div>
+      {row('我给出', give, setGive, (r) => hand[r])}
+      {row('我想要', want, setWant, () => 19)}
+      <div className="offer-foot">
+        <button
+          className="primary-btn"
+          disabled={!ok}
+          onClick={() => send({ kind: 'offer_trade', give, want })}
+        >
+          提议
+        </button>
+      </div>
+    </div>
   )
 }
 

@@ -10,6 +10,7 @@ import {
   type PlayerState,
   type PlayerView,
   type Seat,
+  type TradeOffer,
 } from './types'
 
 /**
@@ -397,9 +398,69 @@ export function legal(s: S, seat: Seat): CatanAction[] {
       if (want !== give && s.bank[want] > 0) out.push({ kind: 'bank_trade', give, want, rate })
   }
 
+  /**
+   * 和别人换。
+   *
+   * 这里只放一个**占位动作**，具体换什么由界面或 bot 自己拼 ——
+   * 和弃牌是同一个处理：五种资源任意组合换任意组合，
+   * 枚举出来是天文数字，而且其中绝大多数没有意义。
+   *
+   * 真正的合法性由 `canTrade` 把关，提议和应答都要过它。
+   */
+  if (handSize(p.hand) > 0 && s.players.length > 1)
+    out.push({ kind: 'offer_trade', give: {}, want: {} })
+
   out.push({ kind: 'end_turn' })
   return out
 }
+
+/** 这笔交易成不成立。**提议方和应答方都要过这一关** */
+export function canTrade(
+  s: S,
+  from: Seat,
+  to: Seat,
+  give: Partial<Hand>,
+  want: Partial<Hand>,
+): boolean {
+  if (from === to) return false
+  const a = s.players.find((p) => p.seat === from)
+  const b = s.players.find((p) => p.seat === to)
+  if (!a || !b) return false
+  const gTotal = RESOURCES.reduce((n, r) => n + (give[r] ?? 0), 0)
+  const wTotal = RESOURCES.reduce((n, r) => n + (want[r] ?? 0), 0)
+  // 空对空、或者单方面白送，都不是交易。白送在规则上其实允许，
+  // 但它会让 bot 之间刷出无意义的记录，而且真人也不会这么干
+  if (gTotal === 0 || wTotal === 0) return false
+  return RESOURCES.every((r) => a.hand[r] >= (give[r] ?? 0) && b.hand[r] >= (want[r] ?? 0))
+}
+
+/**
+ * 成交。
+ *
+ * 注意这是**两个玩家之间**的搬运，银行不参与 ——
+ * 所以资源总量天然不变，守恒断言在这里是白拿的。
+ */
+export function applyTrade(
+  s: S,
+  from: Seat,
+  to: Seat,
+  give: Partial<Hand>,
+  want: Partial<Hand>,
+  emit: (e: CatanEvent) => void,
+) {
+  if (!canTrade(s, from, to, give, want)) throw new Error('这笔交易不成立')
+  const a = s.players.find((p) => p.seat === from)!
+  const b = s.players.find((p) => p.seat === to)!
+  for (const r of RESOURCES) {
+    const g = give[r] ?? 0
+    const w = want[r] ?? 0
+    a.hand[r] += w - g
+    b.hand[r] += g - w
+  }
+  emit({ t: 'trade_done', from, to, give, want })
+}
+
+export type { TradeOffer }
 
 /** 本回合买的不能用，胜利点卡不能"打"，一回合只能打一张 */
 function canPlayDev(p: PlayerState, kind: DevKind): boolean {
@@ -639,6 +700,11 @@ export function apply(
       emit({ t: 'bank_traded', seat, give: a.give, want: a.want, rate })
       return
     }
+
+    case 'offer_trade':
+      // 提议本身不改状态，成交与否由 runner 问过一圈之后决定
+      emit({ t: 'trade_offered', from: seat, give: a.give, want: a.want })
+      return
 
     case 'end_turn': {
       p.devFresh = 0

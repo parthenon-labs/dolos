@@ -7,6 +7,7 @@ import { startDdzSession } from '../../ddz/session'
 import { useDdz } from '../../ddz/useDdz'
 import type { Seat } from '../../ddz/types'
 import { Avatar } from '../match/Avatar'
+import { useKeys } from '../lobby/useKeys'
 import { CardRow, DdzCard } from './DdzCard'
 
 /**
@@ -46,6 +47,19 @@ export function DdzTable() {
     if (roster.length !== 3) return
     return startDdzSession({ seats: roster })
   }, [roster])
+
+  /**
+   * 键盘。
+   *
+   * 斗地主一局要出十几手，全靠鼠标在牌和按钮之间来回跑很累。
+   * 三个键就够：**空格出牌、Esc 不要、Tab 提示** ——
+   * 都是手不用离开原位就能按到的。
+   */
+  useKeys({
+    ' ': () => canPlay && pending?.kind === 'play' && pending.resolve({ kind: 'play', cards: selected }),
+    Escape: () => myTurn && !mustPlay && pending?.kind === 'play' && pending.resolve({ kind: 'pass' }),
+    Tab: () => myTurn && hint(),
+  })
 
   const logBox = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -203,13 +217,13 @@ export function DdzTable() {
             </>
           ) : myTurn ? (
             <>
-              <button className="ghost-btn" onClick={hint}>
+              <button className="ghost-btn" onClick={hint} title="Tab">
                 提示
               </button>
               <button
                 className="ghost-btn"
                 disabled={mustPlay}
-                title={mustPlay ? '轮到你自由出牌，不能不要' : ''}
+                title={mustPlay ? '轮到你自由出牌，不能不要' : 'Esc'}
                 onClick={() => pending!.resolve({ kind: 'pass' })}
               >
                 不要
@@ -217,6 +231,7 @@ export function DdzTable() {
               <button
                 className="primary-btn"
                 disabled={!canPlay}
+                title="空格"
                 onClick={() => pending!.resolve({ kind: 'play', cards: selected })}
               >
                 出牌

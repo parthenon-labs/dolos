@@ -2141,3 +2141,249 @@ em.ai {
   .lb-game-name, .lb-seats i, .lb-status { display: none; }
   .lb-seats-n { margin-left: 0; }
 }
+
+/* =========================================================
+   动效
+
+   一条总原则：**动效是用来说明"发生了什么"的，不是装饰。**
+   所以每一条都对应一个具体的认知问题 ——
+   换屏了 / 这个东西是新出现的 / 你刚才点的是它 / 这里不能点。
+
+   两条硬约束：
+   - **快**。界面动效超过 300ms 就开始碍事，连续操作时尤其明显
+   - **可关**。系统级的"减少动态效果"必须尊重，这不是可选项
+   ========================================================= */
+
+:root {
+  /* 出场用的缓动：起步快、收尾慢，看起来像东西自己停下来的 */
+  --ease-out: cubic-bezier(.22, .86, .28, 1);
+  --ease-pop: cubic-bezier(.34, 1.42, .48, 1);
+}
+
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(10px) scale(.99); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes modal-pop {
+  from { opacity: 0; transform: translateY(14px) scale(.92); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes row-in {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(.82); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 换屏。四屏之间是硬切的话，人会有一瞬间不知道自己在哪 */
+.lb, .lb-start, .poker, .ddz, .catan {
+  animation: screen-in .26s var(--ease-out) both;
+}
+.lb-modal-back { animation: fade-in .16s linear both; }
+.lb-modal { animation: modal-pop .22s var(--ease-pop) both; }
+
+/*
+  房间行逐条进场。
+  错开的意义不在好看，在于**让人看出这是一份刚刷出来的列表** ——
+  整块一起淡入的话，翻页和刷新看起来跟没反应一样。
+  只错开前十行，再多就变成等待了。
+*/
+.lb-row { animation: row-in .22s var(--ease-out) both; }
+.lb-row:nth-child(1) { animation-delay: 0ms; }
+.lb-row:nth-child(2) { animation-delay: 22ms; }
+.lb-row:nth-child(3) { animation-delay: 44ms; }
+.lb-row:nth-child(4) { animation-delay: 66ms; }
+.lb-row:nth-child(5) { animation-delay: 88ms; }
+.lb-row:nth-child(6) { animation-delay: 110ms; }
+.lb-row:nth-child(7) { animation-delay: 132ms; }
+.lb-row:nth-child(8) { animation-delay: 154ms; }
+.lb-row:nth-child(9) { animation-delay: 176ms; }
+.lb-row:nth-child(10) { animation-delay: 198ms; }
+
+.lb-seat { animation: pop-in .26s var(--ease-pop) both; }
+.lb-seat:nth-child(2) { animation-delay: 60ms; }
+.lb-seat:nth-child(3) { animation-delay: 120ms; }
+.lb-seat:nth-child(4) { animation-delay: 180ms; }
+.lb-seat:nth-child(5) { animation-delay: 240ms; }
+.lb-seat:nth-child(6) { animation-delay: 300ms; }
+
+/* 焦点圈。键盘操作的人需要它，而且它不该长得像 hover */
+.lb-btn:focus-visible,
+.lb-input:focus-visible,
+.lb-tab:focus-visible,
+.lb-gamecard:focus-visible {
+  outline: 3px solid #ffb02e;
+  outline-offset: 2px;
+}
+.ghost-btn:focus-visible,
+.primary-btn:focus-visible {
+  outline: 2px solid #d4a72c;
+  outline-offset: 2px;
+}
+
+/*
+  系统开了"减少动态效果"就全部关掉。
+  这不是照顾少数人 —— 前庭功能敏感的人看这类位移会真的难受。
+*/
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ---------- 大厅：快速开始与右上角 ---------- */
+
+.lb-topright { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.lb-me { margin-left: 0; }
+.lb-sound { padding: 8px 11px; }
+.lb-sound svg { display: block; }
+/* 最常用的按钮，给它一点存在感：略大、常驻微光 */
+.lb-quick {
+  padding: 9px 22px;
+  font-size: 15px;
+  box-shadow: 0 4px 0 var(--go-lip), 0 0 22px #ffb02e4d;
+}
+
+/* ---------- 房间：聊天 ---------- */
+
+.lb-room .lb-board {
+  grid-template-columns: minmax(0, 1fr) 250px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 14px;
+}
+.lb-roommain { min-height: 0; display: grid; }
+.lb-room .lb-roomfoot { grid-column: 1 / -1; }
+
+.lb-chat {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-height: 0;
+}
+.lb-chat-lines {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 10px 11px;
+  border: 2.5px solid var(--ink);
+  border-radius: 14px;
+  background: #fffdf7;
+  font: 700 12.5px/1.75 var(--font);
+}
+.lb-chat-empty { color: #c0a78c; }
+.lb-chat-line b { margin-right: 6px; color: #b5713a; }
+.lb-chat-sys { color: #a08a6f; font-style: italic; }
+.lb-chat-input { display: flex; gap: 6px; }
+.lb-chat-input .lb-input { flex: 1; min-width: 0; padding: 7px 10px; font-size: 13px; }
+
+@media (max-width: 900px) {
+  .lb-room .lb-board { grid-template-columns: minmax(0, 1fr); }
+  .lb-chat { display: none; }
+}
+
+/* ---------- 卡坦：跟人换牌 ---------- */
+
+.catan-sheet.wide { width: min(760px, 94vw); }
+.offer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid #241a12;
+  flex-wrap: wrap;
+}
+.offer-row .tl { min-width: 64px; font: 12.5px/1.5 system-ui; color: #cbb08a; }
+.offer-pick { display: flex; align-items: center; gap: 4px; }
+.offer-pick .dl { min-width: 44px; text-align: center; font: 12px/1 system-ui; color: #9a8168; }
+.offer-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+/* 有人跟你换。压在牌桌中央，因为它是**要立刻回答**的事 */
+.catan-ask {
+  position: fixed;
+  inset: 0;
+  z-index: 52;
+  display: grid;
+  place-items: center;
+  background: #06040366;
+  animation: fade-in .14s linear both;
+}
+.ask-card {
+  width: min(420px, 92vw);
+  padding: 20px 22px 18px;
+  border: 1px solid #45311f;
+  border-radius: 12px;
+  background: linear-gradient(#1f150d, #150e08);
+  box-shadow: 0 24px 60px #000b;
+  animation: modal-pop .2s var(--ease-pop) both;
+}
+.ask-head { display: flex; align-items: baseline; gap: 6px; color: #e9dcc9; font-size: 15px; }
+.ask-head b { color: #e8c65a; font-weight: 600; }
+.ask-timer { margin-left: auto; font: 600 13px/1 system-ui; color: #8a7159; }
+.ask-rows { margin: 16px 0 18px; display: grid; gap: 8px; }
+.ask-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 9px; }
+/* 付出是红底、得到是绿底。哪一行是自己的钱，不该让人读文字才知道 */
+.ask-row.give { background: #3a17111f; border: 1px solid #5c2a20; }
+.ask-row.get { background: #14301c1f; border: 1px solid #26523a; }
+.ask-label { min-width: 56px; font: 12.5px/1 system-ui; color: #9a8168; }
+.ask-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.ask-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid #3a2a1e;
+  border-radius: 7px;
+  background: #14100b;
+  font: 12.5px/1 system-ui;
+  color: #cbb08a;
+}
+.ask-chip b { color: #f2e6d0; font: 700 14px/1 system-ui; }
+.ask-chip.brick  { border-color: #6b3520; }
+.ask-chip.lumber { border-color: #26492f; }
+.ask-chip.wool   { border-color: #4f6130; }
+.ask-chip.grain  { border-color: #6d5a16; }
+.ask-chip.ore    { border-color: #3f434b; }
+.ask-foot { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* ---------- 斗地主：出牌动效 ---------- */
+
+@keyframes card-drop {
+  from { opacity: 0; transform: translateY(-22px) rotate(-6deg) scale(.9); }
+  to   { opacity: 1; transform: none; }
+}
+.cardrow-slot { animation: card-drop .22s var(--ease-out) both; }
+
+/* 手牌抬一下。选中是 -16px，hover 只抬一半 —— 两个状态要能分开 */
+.ddz-hand .hand-slot:hover .ddzcard.clickable:not(.sel) { transform: translateY(-8px); }
+.ddzcard { transition: transform .12s var(--ease-out), box-shadow .12s; }
+
+.pass-mark { animation: pop-in .2s var(--ease-pop) both; }
+
+/* ---------- 卡坦：落子与强盗 ---------- */
+
+@keyframes bldg-pop {
+  0%   { opacity: 0; transform: scale(.4) translateY(-6px); }
+  60%  { transform: scale(1.14); }
+  100% { opacity: 1; transform: none; }
+}
+.catan-vertex .bldg { animation: bldg-pop .3s var(--ease-pop) both; }
+.robber { transition: transform .35s var(--ease-out); }
+/* 可点的位置轻轻呼吸。静止的小黄点在一屏地块里根本看不见 */
+@keyframes spot-breathe {
+  0%, 100% { r: 7; opacity: .55; }
+  50%      { r: 9; opacity: .95; }
+}
+.catan-vertex.pickable .spot { animation: spot-breathe 1.4s ease-in-out infinite; }
+.catan-road.pickable { animation: fade-in .2s linear both; }
+
+/* 交易面板里"付出/得到"两行的底色要更实一点，
+   太淡的话红绿的区分在暗色界面上基本消失 */
+.ask-row.give { background: #3a171147; }
+.ask-row.get { background: #14301c47; }

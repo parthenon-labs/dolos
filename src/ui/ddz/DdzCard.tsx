@@ -65,7 +65,13 @@ export function CardRow({
   return (
     <div className="cardrow" style={{ width: cards.length ? w + (cards.length - 1) * w * (1 - overlap) : 0 }}>
       {cards.map((c, i) => (
-        <div key={c} style={{ left: i * w * (1 - overlap) }} className="cardrow-slot">
+        <div
+          key={c}
+          // 逐张错开落下。整叠一起出现看不出"打了几张"，
+          // 而张数正是斗地主里最要紧的信息
+          style={{ left: i * w * (1 - overlap), animationDelay: `${i * 34}ms` }}
+          className="cardrow-slot"
+        >
           <DdzCard card={c} size={size} />
         </div>
       ))}

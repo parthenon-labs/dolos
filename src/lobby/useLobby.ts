@@ -19,6 +19,8 @@ export type RoomPlayer = {
   host: boolean
 }
 
+export type ChatLine = { id: number; who: string; text: string; system?: boolean }
+
 export type Room = {
   id: string
   /** 四位房号。玩家之间报房号比报名字快 */
@@ -30,6 +32,7 @@ export type Room = {
   locked: boolean
   password: string | null
   status: 'waiting' | 'playing'
+  chat: ChatLine[]
 }
 
 export type Filter = GameId | 'all'
@@ -78,8 +81,17 @@ function mockRoom(): Room {
     locked,
     password: locked ? '1234' : null,
     status: filled >= max || Math.random() < 0.25 ? 'playing' : 'waiting',
+    chat: [],
   }
 }
+
+/** 补位 AI 在房间里会说的话。少而杂，多了会露馅 */
+const AI_LINES = [
+  '来了来了', '等等我', '开吧开吧', '这把稳了', '手气不行啊',
+  '刚输一把', '有人吗', '快点快点', '我准备好了', '摸鱼中',
+  '这局我先看看', '上一把太惨了', '再来一局', '走一个',
+]
+let chatId = 0
 
 const makeRooms = (n: number) => Array.from({ length: n }, mockRoom)
 
@@ -94,6 +106,13 @@ type LobbyState = {
   query: string
   page: number
 
+  /** 大厅自己动起来：有人进有人出、有房间开了又散了 */
+  tick: () => void
+  /** 一键开玩。返回失败原因，成功返回 null */
+  quickPlay: () => string | null
+  say: (text: string) => void
+  /** 房里的 AI 随口说一句 */
+  aiChatter: () => void
   setFilter: (f: Filter) => void
   setQuery: (q: string) => void
   setPage: (p: number) => void
@@ -124,6 +143,94 @@ export const useLobby = create<LobbyState>((set, get) => ({
   query: '',
   page: 0,
 
+  /**
+   * 让大厅活着。
+   *
+   * 一个**一动不动的房间列表看起来像张截图** —— 玩家会觉得这里没人。
+   * 所以每隔几秒动一处：有人进房、有人退、某局开了、某局散了、
+   * 偶尔冒出一间新的或者少一间。我自己那间永远不碰。
+   */
+  tick: () =>
+    set((s) => {
+      const others = s.rooms.filter((r) => r.id !== s.myRoomId)
+      if (others.length === 0) return {}
+      const i = Math.floor(Math.random() * others.length)
+      const target = others[i]
+      const roll = Math.random()
+
+      let next: Room | null = { ...target }
+      if (roll < 0.12 && s.rooms.length > 14) {
+        next = null // 散了
+      } else if (roll < 0.2 && s.rooms.length < 34) {
+        // 新开一间，插在最前面
+        return { rooms: [mockRoom(), ...s.rooms] }
+      } else if (target.status === 'playing') {
+        if (roll < 0.55) next.status = 'waiting'
+      } else if (next.players.length < next.max && roll < 0.6) {
+        const taken = new Set(next.players.map((p) => p.name))
+        const add = mockPlayers(next.max).find((p) => !taken.has(p.name))
+        if (add) next.players = [...next.players, { ...add, host: false }]
+        if (next.players.length >= next.max) next.status = 'playing'
+      } else if (next.players.length > 1) {
+        next.players = next.players.slice(0, -1)
+      }
+
+      return {
+        rooms: next
+          ? s.rooms.map((r) => (r.id === target.id ? next! : r))
+          : s.rooms.filter((r) => r.id !== target.id),
+      }
+    }),
+
+  /**
+   * 一键开玩。
+   *
+   * **能玩之前不该点五下。** 先在当前筛选下找一间进得去的（优先挑人最多的
+   * ——最快能开局），找不到就直接开一间。这是这个大厅里最常用的按钮，
+   * 也是"丝滑"这件事上性价比最高的一处。
+   */
+  quickPlay: () => {
+    const s = get()
+    const want = s.filter === 'all' ? null : s.filter
+    const open = s.rooms
+      .filter(
+        (r) => r.status === 'waiting' && !r.locked && r.players.length < r.max && (!want || r.game === want),
+      )
+      .sort((a, b) => b.players.length - a.players.length)
+    if (open.length > 0) return s.join(open[0].id)
+    s.createRoom({ name: '快速开始', game: want ?? 'ddz', password: null })
+    return null
+  },
+
+  say: (text) =>
+    set((s) => {
+      const t = text.trim()
+      if (!t) return {}
+      return {
+        rooms: s.rooms.map((r) =>
+          r.id === s.myRoomId
+            ? { ...r, chat: [...r.chat, { id: chatId++, who: ME.name, text: t }].slice(-40) }
+            : r,
+        ),
+      }
+    }),
+
+  aiChatter: () =>
+    set((s) => {
+      const room = s.rooms.find((r) => r.id === s.myRoomId)
+      if (!room || room.status === 'playing') return {}
+      const ais = room.players.filter((p) => p.isAI)
+      if (ais.length === 0) return {}
+      const who = pick(ais).name
+      return {
+        rooms: s.rooms.map((r) =>
+          r.id === room.id
+            ? { ...r, chat: [...r.chat, { id: chatId++, who, text: pick(AI_LINES) }].slice(-40) }
+            : r,
+        ),
+      }
+    }),
+
   setFilter: (filter) => set({ filter, page: 0 }),
   setQuery: (query) => set({ query, page: 0 }),
   setPage: (page) => set({ page }),
@@ -146,6 +253,7 @@ export const useLobby = create<LobbyState>((set, get) => ({
       locked: !!password,
       password,
       status: 'waiting',
+      chat: [{ id: chatId++, who: '', text: '房间开好了，等人齐就能开始', system: true }],
     }
     set((s) => ({ rooms: [room, ...s.rooms], myRoomId: room.id, page: 0 }))
     return room.id
@@ -160,7 +268,18 @@ export const useLobby = create<LobbyState>((set, get) => ({
     set((s) => ({
       myRoomId: id,
       rooms: s.rooms.map((r) =>
-        r.id === id ? { ...r, players: [...r.players, { ...ME, isAI: false, host: false }] } : r,
+        r.id === id
+          ? {
+              ...r,
+              players: [...r.players, { ...ME, isAI: false, host: false }],
+              chat: [
+                ...r.chat,
+                { id: chatId++, who: '', text: `${ME.name}进来了`, system: true },
+                // 进门有人搭话，房间才像有人。全静默的房间比空房间更冷
+                { id: chatId++, who: r.players[0].name, text: pick(AI_LINES) },
+              ].slice(-40),
+            }
+          : r,
       ),
     }))
     return null

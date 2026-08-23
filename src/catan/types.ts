@@ -80,6 +80,9 @@ export type GameState = {
   turnNo: number
 }
 
+/** 一次交易提议。给出去的和想要的都可以是好几种资源 */
+export type TradeOffer = { from: Seat; give: Partial<Hand>; want: Partial<Hand> }
+
 export type CatanAction =
   | { kind: 'place_settlement'; vertex: number }
   | { kind: 'place_road'; edge: number }
@@ -95,6 +98,7 @@ export type CatanAction =
   | { kind: 'play_year_of_plenty'; a: Resource; b: Resource }
   | { kind: 'play_monopoly'; res: Resource }
   | { kind: 'bank_trade'; give: Resource; want: Resource; rate: number }
+  | { kind: 'offer_trade'; give: Partial<Hand>; want: Partial<Hand> }
   | { kind: 'end_turn' }
 
 /** 发给某一家的视图。**隐藏信息唯一的出口** */
@@ -149,6 +153,9 @@ export type CatanEvent =
   | { t: 'bought_dev'; seat: Seat }
   | { t: 'played_dev'; seat: Seat; card: DevKind; detail?: string }
   | { t: 'bank_traded'; seat: Seat; give: Resource; want: Resource; rate: number }
+  | { t: 'trade_offered'; from: Seat; give: Partial<Hand>; want: Partial<Hand> }
+  | { t: 'trade_done'; from: Seat; to: Seat; give: Partial<Hand>; want: Partial<Hand> }
+  | { t: 'trade_refused'; from: Seat }
   | { t: 'longest_road'; seat: Seat; len: number }
   | { t: 'largest_army'; seat: Seat; n: number }
   | { t: 'won'; seat: Seat; vp: number }

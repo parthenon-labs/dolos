@@ -2,6 +2,7 @@ import { RuleBot, type PokerAgent } from './agent'
 import { project } from './engine'
 import { nextButton, runHand, type TableSeat } from './table'
 import type { Action, PlayerView, PokerEvent, Seat, TableConfig } from './types'
+import { sfx } from '../audio/sfx'
 import { describeEvent, useTable } from './useTable'
 
 /**
@@ -112,6 +113,12 @@ export function startSession(opts: SessionOptions): () => void {
 
       const apply = (e: PokerEvent) => {
         const st = useTable.getState()
+        // 声音只跟这几件事：发牌、下注、开街、结算。
+        // 每个事件都响会糊成一片，反而听不出发生了什么
+        if (e.t === 'hole_dealt') sfx('deal')
+        else if (e.t === 'acted') sfx(e.action.kind === 'fold' ? 'back' : 'chip')
+        else if (e.t === 'street') sfx('card')
+        else if (e.t === 'awarded') sfx(e.rows.some((r) => r.seat === 0 && r.won > 0) ? 'win' : 'lose')
         const d = describeEvent(e, nameOf)
         if (d) st.push(d.text, d.kind)
         if (e.t === 'acted') st.setLastActor(e.seat)

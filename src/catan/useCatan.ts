@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { CatanAction, CatanEvent, PlayerView, Seat } from './types'
+import type { CatanAction, CatanEvent, PlayerView, Seat, TradeOffer } from './types'
 
 /**
  * 卡坦岛在**界面这一侧**的状态。
@@ -19,9 +19,13 @@ export type Pending = {
   resolve: (a: CatanAction) => void
 }
 
+/** 别人提议跟你换，等你答。**必须有超时** —— 玩家走开了牌局不能就此卡死 */
+export type TradeAsk = { offer: TradeOffer; resolve: (yes: boolean) => void }
+
 type CatanUi = {
   view: PlayerView | null
   pending: Pending | null
+  tradeAsk: TradeAsk | null
   log: LogRow[]
   /** 谁在思考 */
   thinking: Seat | null
@@ -31,6 +35,7 @@ type CatanUi = {
 
   setView: (v: PlayerView) => void
   setPending: (p: Pending | null) => void
+  setTradeAsk: (t: TradeAsk | null) => void
   push: (text: string, kind?: LogRow['kind']) => void
   setThinking: (s: Seat | null) => void
   setLastRoll: (r: CatanUi['lastRoll']) => void
@@ -43,6 +48,7 @@ let logId = 0
 export const useCatan = create<CatanUi>((set) => ({
   view: null,
   pending: null,
+  tradeAsk: null,
   log: [],
   thinking: null,
   lastRoll: null,
@@ -50,13 +56,14 @@ export const useCatan = create<CatanUi>((set) => ({
 
   setView: (view) => set({ view }),
   setPending: (pending) => set({ pending }),
+  setTradeAsk: (tradeAsk) => set({ tradeAsk }),
   push: (text, kind = 'action') =>
     set((s) => ({ log: [...s.log, { id: logId++, text, kind }].slice(-80) })),
   setThinking: (thinking) => set({ thinking }),
   setLastRoll: (lastRoll) => set({ lastRoll }),
   setResult: (result) => set({ result }),
   reset: () =>
-    set({ view: null, pending: null, log: [], thinking: null, lastRoll: null, result: null }),
+    set({ view: null, pending: null, tradeAsk: null, log: [], thinking: null, lastRoll: null, result: null }),
 }))
 
 /** 从合法选项里挑出某一类，界面拿它做高亮 */

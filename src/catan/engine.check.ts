@@ -65,6 +65,8 @@ const seen = {
   cities: 0,
   portTrades: 0,
   bankTrades: 0,
+  tradesOffered: 0,
+  tradesDone: 0,
 }
 let totalSteps = 0
 let totalTurns = 0
@@ -166,6 +168,8 @@ for (let g = 1; g <= GAMES; g++) {
       case 'largest_army': seen.largestArmy++; break
       case 'built': if (e.what === 'city') seen.cities++; break
       case 'bank_traded': seen.bankTrades++; if (e.rate < 4) seen.portTrades++; break
+      case 'trade_offered': seen.tradesOffered++; break
+      case 'trade_done': seen.tradesDone++; break
     }
   }
 }
@@ -193,6 +197,21 @@ need('最大军易主', seen.largestArmy, 50)
 need('升城市', seen.cities, 300)
 need('换银行', seen.bankTrades, 200)
 need('港口优惠汇率', seen.portTrades, 20)
+need('提议换牌', seen.tradesOffered, 300)
+console.log(`  平均每局提议 ${(seen.tradesOffered / GAMES).toFixed(1)} 次`)
+need('换牌成交', seen.tradesDone, 100)
+
+/**
+ * 玩家之间换牌是**两个人之间搬运，银行不参与**，所以资源总量必须不变 ——
+ * 上面那条资源守恒已经覆盖了它。这里单独盯一条别的：
+ * 成交率不能是 0 或者 100%。
+ * 全不成交说明应答逻辑写死了拒绝，全成交说明它写死了同意，
+ * 两种都不会让任何断言变红。
+ */
+const rate = seen.tradesDone / Math.max(1, seen.tradesOffered)
+if (rate < 0.05 || rate > 0.9)
+  fail(`换牌成交率 ${(rate * 100).toFixed(0)}% —— 应答逻辑多半写死了`)
+else console.log(`✓ 换牌成交率 ${(rate * 100).toFixed(0)}%`)
 
 /**
  * 先手优势是卡坦的老问题，但**四家胜率不该差太多** ——

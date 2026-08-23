@@ -1,4 +1,15 @@
-import { apply, legal, makeGame, project, totalVp, whoActs, type EngineState, type Seats } from './engine'
+import {
+  applyTrade,
+  apply,
+  canTrade,
+  legal,
+  makeGame,
+  project,
+  totalVp,
+  whoActs,
+  type EngineState,
+  type Seats,
+} from './engine'
 import type { CatanAgent } from './bot'
 import type { CatanAction, CatanEvent, Seat } from './types'
 
@@ -41,6 +52,37 @@ export async function runGame(
       throw new Error(`${seat} 号在 ${s.phase} 阶段没有任何合法动作，这是引擎 bug`)
     }
     const a: CatanAction = await agents.get(seat)!.act(project(s, seat), opts)
+
+    /**
+     * 交易要问一圈，所以它不能只是 `apply` 一下。
+     *
+     * 引擎保持纯的：它只提供"这笔交易成不成立"和"成交"。
+     * **谁愿意接是对局流程的事，不是规则的事** —— 放进 apply 里
+     * 就等于让引擎去 await 别的 agent，那条线一旦拉出来就收不回去了。
+     *
+     * 按座位顺序问，先答应的先成交。真人桌上也是这样。
+     */
+    if (a.kind === 'offer_trade') {
+      apply(s, seat, a, rng, emit)
+      let done = false
+      for (let k = 1; k < s.players.length && !done; k++) {
+        const other = s.players[(seat + k) % s.players.length].seat
+        if (!canTrade(s, seat, other, a.give, a.want)) continue
+        const yes = await agents.get(other)!.respondTrade?.(project(s, other), {
+          from: seat,
+          give: a.give,
+          want: a.want,
+        })
+        if (yes && canTrade(s, seat, other, a.give, a.want)) {
+          applyTrade(s, seat, other, a.give, a.want, emit)
+          done = true
+        }
+      }
+      if (!done) emit({ t: 'trade_refused', from: seat })
+      steps++
+      continue
+    }
+
     apply(s, seat, a, rng, emit)
     steps++
   }

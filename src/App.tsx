@@ -4,8 +4,10 @@ import { Suspense } from 'react'
 import * as THREE from 'three'
 import { Scene } from './scene/Scene'
 import { Shell } from './ui/Shell'
+import { useClickSound } from './audio/useSound'
 
 export default function App() {
+  useClickSound()
   return (
     <>
       <Canvas

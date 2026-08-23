@@ -7,6 +7,7 @@ import {
   type Hand,
   type PlayerView,
   type Seat,
+  type TradeOffer,
 } from './types'
 
 /**
@@ -24,6 +25,8 @@ export const pips = (n: number | null) => (n === null ? 0 : 6 - Math.abs(7 - n))
 
 export interface CatanAgent {
   act(view: PlayerView, options: CatanAction[]): Promise<CatanAction> | CatanAction
+  /** 别人提议跟你换，接不接。不实现就等于永远不接 */
+  respondTrade?(view: PlayerView, offer: TradeOffer): Promise<boolean> | boolean
 }
 
 /** 每种资源现在值多少。缺的比多的值钱，矿和麦在后期最贵 */
@@ -247,19 +250,57 @@ export class RuleBot implements CatanAgent {
     if (roads.length > 0 && me.settlementsLeft > 0 && (flush || this.rng() < 0.35 + this.nerve * 0.4))
       return this.bestRoad(v, roads)
 
-    // 6. 买发展卡。资源花不出去的时候买卡，总比攥着强
+    // 6. 先问问人。**和人换比和银行换划算得多**（银行至少四换一，
+    //    港口也要三换一，而人换人是一换一），所以顺序在银行前面
+    const offer = this.proposeTrade(v, opts)
+    if (offer) return offer
+
+    // 7. 买发展卡。资源花不出去的时候买卡，总比攥着强
     const buy = opts.find((o) => o.kind === 'buy_dev')
     if (buy && (flush || this.rng() < 0.5 + this.nerve * 0.3)) return buy
 
-    // 7. 换银行，凑下一个目标。快被强盗抓了就放宽条件，换到最缺的那种
+    // 8. 换银行，凑下一个目标。快被强盗抓了就放宽条件，换到最缺的那种
     const trade = this.bestTrade(v, pick('bank_trade'), flush)
     if (trade) return trade
 
-    // 8. 修路卡留到有路可铺的时候
+    // 9. 修路卡留到有路可铺的时候
     const rb = opts.find((o) => o.kind === 'play_road_building')
     if (rb && me.roadsLeft >= 2) return rb
 
     return opts.find((o) => o.kind === 'end_turn')!
+  }
+
+  /**
+   * 主动提议交易。
+   *
+   * 只提**最简单的一换一**：我多的换我缺的。复杂的组合对 bot 来说
+   * 收益不大，对人来说也很难判断划不划算 —— 一屏弹出来
+   * "三换二"的提议，玩家要算半天，多数人会直接拒。
+   */
+  private proposeTrade(v: PlayerView, opts: CatanAction[]): CatanAction | null {
+    if (!opts.some((o) => o.kind === 'offer_trade')) return null
+    /**
+     * 提议的频率要压得很低。
+     *
+     * 第一版是 45%，三百局里提了 26415 次 —— 摊到每局 88 次，
+     * 也就是**每个回合都要被问一次**。bot 之间无所谓，
+     * 但只要桌上有个真人，那就是每回合弹一次窗，比不能换还烦。
+     */
+    if (this.rng() > 0.16) return null
+    const me = v.players.find((p) => p.seat === v.me)!
+    const wantCity =
+      me.citiesLeft > 0 && v.buildings.some((b) => b?.owner === v.me && b.kind === 'settlement')
+    const goal: Partial<Hand> = wantCity ? COSTS.city : COSTS.settlement
+
+    const missing = RESOURCES.filter((r) => v.myHand[r] < (goal[r] ?? 0)).sort(
+      (a, b) => (goal[b] ?? 0) - v.myHand[b] - ((goal[a] ?? 0) - v.myHand[a]),
+    )
+    // 多出来的：目标用不上、而且手里有两张以上的
+    const spare = RESOURCES.filter((r) => v.myHand[r] - (goal[r] ?? 0) >= 2).sort(
+      (a, b) => v.myHand[b] - v.myHand[a],
+    )
+    if (missing.length === 0 || spare.length === 0) return null
+    return { kind: 'offer_trade', give: { [spare[0]]: 1 }, want: { [missing[0]]: 1 } }
   }
 
   private bestRoad(
@@ -284,6 +325,39 @@ export class RuleBot implements CatanAgent {
       }
     }
     return best
+  }
+
+  /**
+   * 别人提议跟你换，接不接。
+   *
+   * 三条判据，按重要性：
+   * - **领先的人别帮**。快到十分的那个提出来的交易，多半对他更有利
+   * - 换进来的比换出去的更需要（用同一套 needs 打分）
+   * - 换出去之后不能把自己正在攒的东西拆了
+   *
+   * 少了第一条，bot 会一路把冠军喂到底 —— 那比不会换更糟。
+   */
+  respondTrade(v: PlayerView, offer: TradeOffer): boolean {
+    const me = v.players.find((p) => p.seat === v.me)!
+    const him = v.players.find((p) => p.seat === offer.from)
+    if (!him) return false
+    // 他要赢了就别帮
+    if (him.publicVp >= 8) return false
+    // 我拿到 offer.give，付出 offer.want
+    const want = needs(v)
+    let gain = 0
+    let cost = 0
+    for (const r of RESOURCES) {
+      const g = offer.give[r] ?? 0
+      const w = offer.want[r] ?? 0
+      if (w > v.myHand[r]) return false
+      gain += g * want[r]
+      cost += w * want[r]
+    }
+    if (gain <= cost) return false
+    // 领先者要多要一点才划算；落后者可以松一点
+    const margin = me.publicVp >= him.publicVp ? 1.35 : 1.1
+    return gain >= cost * margin + this.rng() * 0.6
   }
 
   /** 只在**换完真能凑出东西**的时候换，别为了换而换 */

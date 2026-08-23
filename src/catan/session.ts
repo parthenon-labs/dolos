@@ -1,7 +1,16 @@
 import { RESOURCE_NAMES, type Resource } from './board'
 import { RuleBot, type CatanAgent } from './bot'
 import { runGame } from './runner'
-import { DEV_NAMES, handSize, type CatanAction, type CatanEvent, type PlayerView, type Seat } from './types'
+import {
+  DEV_NAMES,
+  handSize,
+  type CatanAction,
+  type CatanEvent,
+  type PlayerView,
+  type Seat,
+  type TradeOffer,
+} from './types'
+import { sfx } from '../audio/sfx'
 import { useCatan } from './useCatan'
 
 /**
@@ -11,7 +20,32 @@ import { useCatan } from './useCatan'
  * 界面只认 CatanEvent 和 PlayerView，那一步不用改渲染。
  */
 
+/** 别人提议跟你换，多久没答就当拒绝 */
+const TRADE_TIMEOUT_MS = 14000
+
 class HumanAgent implements CatanAgent {
+  /**
+   * 有人跟你换牌。
+   *
+   * **必须能超时。** 玩家去倒杯水，整局就卡在这里等他 ——
+   * 这在单机里只是烦，联机时是把三个人一起冻住。
+   * 超时当拒绝，是最保守也最不会出错的默认。
+   */
+  respondTrade(_view: PlayerView, offer: TradeOffer): Promise<boolean> {
+    return new Promise((resolve) => {
+      let done = false
+      const finish = (yes: boolean) => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        useCatan.getState().setTradeAsk(null)
+        resolve(yes)
+      }
+      const timer = setTimeout(() => finish(false), TRADE_TIMEOUT_MS)
+      useCatan.getState().setTradeAsk({ offer, resolve: finish })
+    })
+  }
+
   act(view: PlayerView, options: CatanAction[]): Promise<CatanAction> {
     useCatan.getState().setView(view)
     return new Promise((resolve) => {
@@ -56,6 +90,11 @@ class PacedBot implements CatanAgent {
     private inner: RuleBot,
     private seat: Seat,
   ) {}
+  async respondTrade(view: PlayerView, offer: TradeOffer): Promise<boolean> {
+    // 停一下再答，不然"提议"和"成交"会在同一帧刷出来，看不出发生过什么
+    await new Promise((r) => setTimeout(r, 420))
+    return this.inner.respondTrade(view, offer)
+  }
   async act(view: PlayerView, options: CatanAction[]): Promise<CatanAction> {
     useCatan.getState().setThinking(this.seat)
     useCatan.getState().setView(view)
@@ -116,6 +155,7 @@ function apply(e: CatanEvent, nameOf: (s: Seat) => string) {
   const st = useCatan.getState()
   switch (e.t) {
     case 'setup_placed':
+      sfx('place')
       st.push(
         `${nameOf(e.seat)} 摆下村庄` + (e.gained && handSize(e.gained as never) ? `，收 ${listHand(e.gained)}` : ''),
       )
@@ -126,10 +166,12 @@ function apply(e: CatanEvent, nameOf: (s: Seat) => string) {
       st.push(`—— 第 ${e.turnNo} 回合 · ${nameOf(e.seat)} ——`, 'system')
       break
     case 'rolled':
+      sfx('dice')
       st.setLastRoll({ dice: e.dice, seat: e.seat, at: Date.now() })
       st.push(`${nameOf(e.seat)} 掷出 ${e.sum}（${e.dice[0]}+${e.dice[1]}）`)
       break
     case 'produced':
+      sfx('chip')
       st.push(
         e.rows.map((r) => `${nameOf(r.seat)} 收 ${RESOURCE_NAMES[r.res]}×${r.n}`).join('　'),
         'result',
@@ -142,6 +184,7 @@ function apply(e: CatanEvent, nameOf: (s: Seat) => string) {
       st.push(`${nameOf(e.seat)} 弃掉 ${listHand(e.give)}`)
       break
     case 'robber_moved':
+      sfx('back')
       st.push(
         `${nameOf(e.seat)} 移动强盗` +
           (e.stole
@@ -152,6 +195,7 @@ function apply(e: CatanEvent, nameOf: (s: Seat) => string) {
       )
       break
     case 'built': {
+      sfx('place')
       const what = { road: '路', settlement: '村庄', city: '城市' }[e.what]
       st.push(`${nameOf(e.seat)} 建造${what}`)
       break
@@ -161,6 +205,19 @@ function apply(e: CatanEvent, nameOf: (s: Seat) => string) {
       break
     case 'played_dev':
       st.push(`${nameOf(e.seat)} 打出${DEV_NAMES[e.card]}${e.detail ? `（${e.detail}）` : ''}`, 'result')
+      break
+    case 'trade_offered':
+      st.push(
+        `${nameOf(e.from)} 想用 ${listHand(e.give)} 换 ${listHand(e.want)}`,
+        'result',
+      )
+      break
+    case 'trade_done':
+      sfx('chip')
+      st.push(`${nameOf(e.from)} 和 ${nameOf(e.to)} 换成了`, 'result')
+      break
+    case 'trade_refused':
+      st.push('没人接这笔交易')
       break
     case 'bank_traded':
       st.push(
@@ -174,6 +231,7 @@ function apply(e: CatanEvent, nameOf: (s: Seat) => string) {
       st.push(`${nameOf(e.seat)} 拿下最大军（${e.n} 骑士）`, 'result')
       break
     case 'won':
+      sfx(e.seat === 0 ? 'win' : 'lose')
       st.push(`${nameOf(e.seat)} 达到 ${e.vp} 分，获胜`, 'result')
       st.setResult(e)
       break

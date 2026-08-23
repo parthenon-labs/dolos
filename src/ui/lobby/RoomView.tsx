@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { sfx } from '../../audio/sfx'
 import { gameById } from '../../games/registry'
 import { useLobby, useMyRoom } from '../../lobby/useLobby'
 import { Glyph } from './Glyph'
+import { SoundToggle } from './SoundToggle'
+import { useKeys } from './useKeys'
 
 /**
  * 房间里。
@@ -42,6 +45,23 @@ function RoomBody() {
    * 而那个房主是个 bot，永远不会按。**这不是拟真度问题，是走不通**。
    * 顺带这也更像真的大厅 —— 你进去，坐一会儿，局就开了。
    */
+  useKeys({ Escape: leave })
+
+  // 房里时不时有人说话。间隔拉长而且加随机，等距的发言一眼就是脚本
+  const aiChatter = useLobby((x) => x.aiChatter)
+  useEffect(() => {
+    if (!roomId) return
+    let t: ReturnType<typeof setTimeout>
+    const loop = () => {
+      t = setTimeout(() => {
+        aiChatter()
+        loop()
+      }, 5000 + Math.random() * 7000)
+    }
+    loop()
+    return () => clearTimeout(t)
+  }, [roomId, aiChatter])
+
   useEffect(() => {
     if (iAmHost || !roomId) return
     setCountdown(3)
@@ -62,6 +82,7 @@ function RoomBody() {
         <button className="lb-btn lb-btn-ghost" onClick={leave}>
           ← 回大厅
         </button>
+        <SoundToggle />
         <div className="lb-roomtitle">
           <span className="lb-roomno">{room.no}</span>
           {room.name}
@@ -74,6 +95,7 @@ function RoomBody() {
       </header>
 
       <div className="lb-board">
+        <div className="lb-roommain">
         <div className="lb-seatgrid">
           {Array.from({ length: room.max }, (_, i) => {
             const p = room.players[i]
@@ -97,6 +119,9 @@ function RoomBody() {
             )
           })}
         </div>
+        </div>
+
+        <Chat />
 
         <div className="lb-roomfoot">
           <p className="lb-tagline">{g.tagline}</p>
@@ -115,5 +140,65 @@ function RoomBody() {
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * 房间聊天。
+ *
+ * 功能上它什么也不影响，但**一个不能说话的等待室是死的** ——
+ * 你看着三个名字，不知道他们在不在。补位 AI 会时不时说一句，
+ * 少而杂，多了会露馅。
+ */
+function Chat() {
+  const room = useMyRoom()
+  const say = useLobby((s) => s.say)
+  const [text, setText] = useState('')
+  const box = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (box.current) box.current.scrollTop = box.current.scrollHeight
+  }, [room?.chat.length])
+
+  if (!room) return null
+
+  const send = () => {
+    if (!text.trim()) return
+    say(text)
+    setText('')
+    sfx('click')
+  }
+
+  return (
+    <aside className="lb-chat">
+      <div className="lb-chat-lines" ref={box}>
+        {room.chat.length === 0 && <div className="lb-chat-empty">说点什么</div>}
+        {room.chat.map((c) =>
+          c.system ? (
+            <div key={c.id} className="lb-chat-sys">
+              {c.text}
+            </div>
+          ) : (
+            <div key={c.id} className="lb-chat-line">
+              <b>{c.who}</b>
+              {c.text}
+            </div>
+          ),
+        )}
+      </div>
+      <div className="lb-chat-input">
+        <input
+          className="lb-input"
+          maxLength={40}
+          value={text}
+          placeholder="说两句"
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && send()}
+        />
+        <button className="lb-btn lb-btn-ghost tiny" onClick={send}>
+          发送
+        </button>
+      </div>
+    </aside>
   )
 }

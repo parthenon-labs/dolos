@@ -3,6 +3,7 @@ import { describeCombo } from './combo'
 import { runGame, type DdzAgent, type Seats } from './engine'
 import type { DdzEvent, PlayAction, PlayerView, Seat } from './types'
 import { RANK_LABELS, formatRanks, rankOf } from './cards'
+import { sfx } from '../audio/sfx'
 import { useDdz } from './useDdz'
 
 /**
@@ -144,6 +145,7 @@ function apply(e: DdzEvent, nameOf: (s: Seat) => string) {
       st.clearPlaced()
       break
     case 'landlord':
+      sfx('deal')
       st.push(
         `${nameOf(e.seat)} 当地主，底牌 ${formatRanks(e.bottom)}，${e.base} 分起`,
         'system',
@@ -151,6 +153,7 @@ function apply(e: DdzEvent, nameOf: (s: Seat) => string) {
       st.clearPlaced()
       break
     case 'played':
+      sfx('card')
       st.place(e.seat, e.combo)
       st.push(`${nameOf(e.seat)} 出 ${describeCombo(e.combo)}　剩 ${e.left} 张`)
       break
@@ -159,11 +162,13 @@ function apply(e: DdzEvent, nameOf: (s: Seat) => string) {
       st.push(`${nameOf(e.seat)} 不要`)
       break
     case 'multiplied':
+      sfx('chip')
       st.push(`${nameOf(e.seat)} 的${e.reason} —— ${e.multiplier} 倍`, 'result')
       break
     case 'ended': {
       const who = e.landlordWon ? '地主' : '农民'
       const spring = e.spring === 'spring' ? '　春天！' : e.spring === 'anti' ? '　反春天！' : ''
+      sfx(e.winner === 0 ? 'win' : 'lose')
       st.push(`${who}赢　${e.base} 分 × ${e.multiplier} 倍${spring}`, 'result')
       st.setResult(e)
       break
