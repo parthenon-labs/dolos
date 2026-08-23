@@ -7,6 +7,7 @@ import { startDdzSession } from '../../ddz/session'
 import { useDdz } from '../../ddz/useDdz'
 import type { Seat } from '../../ddz/types'
 import { Avatar } from '../match/Avatar'
+import { SoundToggle } from '../lobby/SoundToggle'
 import { useKeys } from '../lobby/useKeys'
 import { CardRow, DdzCard } from './DdzCard'
 
@@ -123,31 +124,18 @@ export function DdzTable() {
             )}
           </div>
 
-          <Opponent
-            side="left"
-            p={playerOf(left)}
-            roster={roster[left]}
-            placed={placed[left]}
-            thinking={thinking === left}
-            turn={view.turn === left}
-          />
-          <Opponent
-            side="right"
-            p={playerOf(right)}
-            roster={roster[right]}
-            placed={placed[right]}
-            thinking={thinking === right}
-            turn={view.turn === right}
-          />
+          <Opponent side="left" p={playerOf(left)} roster={roster[left]} thinking={thinking === left} turn={view.turn === left} />
+          <Opponent side="right" p={playerOf(right)} roster={roster[right]} thinking={thinking === right} turn={view.turn === right} />
 
-          {/* 我刚出的牌，摆在手牌上方 */}
-          <div className="ddz-mine-played">
-            {placed[me]?.combo ? (
-              <CardRow cards={placed[me]!.combo!.cards} size="sm" overlap={0.5} />
-            ) : placed[me] ? (
-              <div className="pass-mark">不要</div>
-            ) : null}
-          </div>
+          {/*
+            三家出的牌都往台面中间聚。
+            **这是牌桌的样子，也是唯一能一眼看懂"这一轮打成什么样"的排法** ——
+            第一版把每个人出的牌摆在他自己那一栏里，
+            中间空着一大片，而要比较大小的三手牌散在屏幕三个角上。
+          */}
+          <Played className="pile left" placed={placed[left]} size="sm" />
+          <Played className="pile right" placed={placed[right]} size="sm" />
+          <Played className="pile mine" placed={placed[me]} size="md" />
 
           {/* 现在要压什么 */}
           {req && (
@@ -323,6 +311,7 @@ function Top({
         )}
       </div>
       <div className="tools">
+        <SoundToggle variant="dark" />
         <button className="ghost-btn" onClick={onBack}>
           回房间
         </button>
@@ -335,18 +324,38 @@ function Top({
   )
 }
 
+/** 摆在台面上的一手牌。三家共用，只有位置和尺寸不同 */
+function Played({
+  className,
+  placed,
+  size,
+}: {
+  className: string
+  placed: { combo: { cards: Card[] } | null } | null
+  size: 'xs' | 'sm' | 'md'
+}) {
+  if (!placed) return null
+  return (
+    <div className={`ddz-pile ${className}`}>
+      {placed.combo ? (
+        <CardRow cards={placed.combo.cards} size={size} overlap={0.5} />
+      ) : (
+        <div className="pass-mark">不要</div>
+      )}
+    </div>
+  )
+}
+
 function Opponent({
   side,
   p,
   roster,
-  placed,
   thinking,
   turn,
 }: {
   side: 'left' | 'right'
   p?: { name: string; count: number; isLandlord: boolean; color: string }
   roster?: { name: string; color: string }
-  placed: { combo: { cards: Card[] } | null } | null
   thinking: boolean
   turn: boolean
 }) {
@@ -364,15 +373,7 @@ function Opponent({
           <div className={`left${p.count <= 3 ? ' hot' : ''}`}>{p.count} 张</div>
         </div>
       </div>
-      <div className="played">
-        {placed?.combo ? (
-          <CardRow cards={placed.combo.cards} size="xs" overlap={0.5} />
-        ) : placed ? (
-          <div className="pass-mark">不要</div>
-        ) : thinking ? (
-          <div className="thinking">…</div>
-        ) : null}
-      </div>
+      {thinking && <div className="thinking">…</div>}
     </div>
   )
 }

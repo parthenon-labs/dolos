@@ -16,6 +16,7 @@ import {
   type TradeOffer,
 } from '../../catan/types'
 import { Avatar } from '../match/Avatar'
+import { SoundToggle } from '../lobby/SoundToggle'
 import { CatanBoard } from './CatanBoard'
 
 /**
@@ -294,6 +295,7 @@ function Top({ turnNo, onBack, onStand }: { turnNo: number; onBack: () => void; 
         <span className="dim">先到 {VP_TO_WIN} 分</span>
       </div>
       <div className="tools">
+        <SoundToggle variant="dark" />
         <button className="ghost-btn" onClick={onBack}>
           回房间
         </button>

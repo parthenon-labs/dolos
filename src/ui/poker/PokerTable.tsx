@@ -6,6 +6,7 @@ import { useTable } from '../../poker/useTable'
 import { describe, evaluate } from '../../poker/evaluate'
 import type { Seat } from '../../poker/types'
 import { Avatar } from '../match/Avatar'
+import { SoundToggle } from '../lobby/SoundToggle'
 import { Chips } from './Chips'
 import { HandRankings, HowToPlay } from './HandRankings'
 import { PlayingCard } from './PlayingCard'
@@ -108,6 +109,7 @@ export function PokerTable() {
           </button>
         </div>
         <div className="playmoney">虚拟筹码 · 不可充值提现</div>
+        <SoundToggle variant="dark" />
         <button className="ghost-btn" onClick={back}>
           回房间
         </button>

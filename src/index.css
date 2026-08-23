@@ -1169,9 +1169,9 @@ em.ai {
 
 .ddz-opp {
   position: absolute;
-  /* 压到竖直中段：牌桌的戏在中间，两家贴着天花板会让屏幕中央空一大块 */
-  top: 34%;
-  width: 210px;
+  /* 名牌回到上方两角，中间整块让给出的牌 */
+  top: 8%;
+  width: 200px;
   padding: 10px 12px;
   border: 1px solid #2a1e15;
   border-radius: 10px;
@@ -1198,8 +1198,16 @@ em.ai {
 }
 /* 剩三张以内就变红。这是斗地主的心跳 */
 .ddz-opp .left.hot { color: #e8785a; }
-.ddz-opp .played { margin-top: 12px; min-height: 40px; }
-.ddz-opp .thinking { color: #6d5a45; letter-spacing: .3em; }
+.ddz-opp .thinking { margin-top: 8px; color: #6d5a45; letter-spacing: .3em; }
+
+/*
+  台面。三家出的牌在这里碰头 —— 左上、右上、正下，
+  中间留给"要压什么"。这是真牌桌的排法，也是唯一能一眼比出大小的排法。
+*/
+.ddz-pile { position: absolute; }
+.ddz-pile.left { left: 28%; top: 26%; }
+.ddz-pile.right { right: 28%; top: 26%; transform: translateX(50%); }
+.ddz-pile.mine { left: 50%; bottom: 14%; transform: translateX(-50%); }
 
 .pass-mark {
   display: inline-block;
@@ -1210,22 +1218,21 @@ em.ai {
   font-size: 12px;
 }
 
-.ddz-mine-played {
-  position: absolute;
-  bottom: 4%;
-  left: 50%;
-  transform: translateX(-50%);
-  min-height: 52px;
-}
 .ddz-req {
   position: absolute;
-  top: 30%;
+  top: 48%;
   left: 50%;
   transform: translateX(-50%);
   font-size: 13px;
   color: #9a8168;
 }
 .ddz-req b { color: #e8c65a; font-weight: 600; }
+.ddz-req {
+  padding: 5px 14px;
+  border: 1px solid #3a2a1e;
+  border-radius: 999px;
+  background: #14100bcc;
+}
 
 .ddz-log {
   margin: 16px 16px 4px 0;
@@ -2136,10 +2143,47 @@ em.ai {
   100% { opacity: 0; transform: translate(-50%, -8px); }
 }
 
+/*
+  窄屏。
+  一行里能塞下的东西少了，所以要**按"扫"的优先级砍** ——
+  砍掉游戏名（左端色条已经说了）、砍掉点阵（留数字）、砍掉状态标签
+  （进不去的行本来就是灰的）。房号、图标、房名、人数、进入按钮留下。
+
+  列数必须和真正显示出来的孩子数对上。第一版列了四列而实际有六个孩子，
+  多出来的两个折到了下一行，每行都戳出半个按钮。
+*/
 @media (max-width: 860px) {
-  .lb-row { grid-template-columns: 52px 40px minmax(0, 1fr) 60px; height: 52px; }
+  .lb { padding: 12px 12px 16px; gap: 10px; }
+  .lb-row {
+    grid-template-columns: 46px 30px minmax(0, 1fr) 42px 62px;
+    height: 52px;
+    padding: 0 10px 0 18px;
+    gap: 8px;
+  }
+  .lb-row::before { width: 8px; }
   .lb-game-name, .lb-seats i, .lb-status { display: none; }
+  .lb-game-ic { width: 26px; height: 26px; border-width: 2px; }
+  .lb-no { font-size: 14px; }
+  .lb-name { font-size: 14px; }
   .lb-seats-n { margin-left: 0; }
+  .lb-btn.tiny { padding: 5px 9px; font-size: 12px; }
+
+  /* 标签页改成横向滚动，别换行 —— 换行会把列表挤掉一整屏 */
+  .lb-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .lb-tab { flex: none; padding: 7px 11px; font-size: 13px; }
+  .lb-tools { position: static; width: 100%; margin-left: 0; }
+  .lb-board { padding: 10px; border-radius: 16px; }
+  .lb-board::before { inset: 4px; border-radius: 12px; }
+  .lb-search { flex: 1; min-width: 0; width: auto; }
+  .lb-logo.small .lb-logo-main { font-size: 21px; }
+  .lb-logo.small .lb-logo-sub { display: none; }
+}
+
+/* 更窄的时候工具条独占一行 */
+@media (max-width: 620px) {
+  .lb-tabs { flex-wrap: wrap; overflow: visible; }
+  .lb-tools { order: 9; }
+  .lb-pager .lb-count { display: none; }
 }
 
 /* =========================================================
@@ -2387,3 +2431,7 @@ em.ai {
    太淡的话红绿的区分在暗色界面上基本消失 */
 .ask-row.give { background: #3a171147; }
 .ask-row.get { background: #14301c47; }
+
+/* 牌桌里的静音开关：跟着暗色调走，不能把大厅那颗奶油色按钮搬过来 */
+.lb-sound.dark { padding: 5px 9px; line-height: 0; }
+.lb-sound.dark svg { display: block; }
