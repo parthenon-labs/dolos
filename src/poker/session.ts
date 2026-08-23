@@ -87,10 +87,18 @@ export function startSession(opts: SessionOptions): () => void {
       const withChips = seats.filter((s) => s.stack > 0)
       if (withChips.length < 2) {
         useTable.getState().push('筹码只剩一个人有，本桌结束', 'system')
+        useTable.getState().setOver({
+          title: '本桌结束',
+          detail: '筹码全到一个人手里了',
+        })
         break
       }
       if (!withChips.some((s) => s.seat === opts.mySeat)) {
         useTable.getState().push('你已经输光了', 'system')
+        useTable.getState().setOver({
+          title: '你输光了',
+          detail: `撑了 ${hand - 1} 手`,
+        })
         break
       }
 
@@ -156,6 +164,8 @@ export function startSession(opts: SessionOptions): () => void {
       // 最终视图（含摊牌信息）给界面
       if (!stopped) useTable.getState().setView(project(r.state, opts.mySeat))
       await sleep(1400)
+      if (hand === maxHands)
+        useTable.getState().setOver({ title: '打满了', detail: `${maxHands} 手，到此为止` })
     }
   })().catch((err) => {
     // 引擎抛错说明是 bug（多半是筹码不守恒的断言），必须显式暴露

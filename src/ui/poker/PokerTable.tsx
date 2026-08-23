@@ -40,6 +40,7 @@ export function PokerTable() {
   const showdown = useTable((s) => s.showdown)
   const awarded = useTable((s) => s.awarded)
   const handNo = useTable((s) => s.handNo)
+  const over = useTable((s) => s.over)
 
   const [sheet, setSheet] = useState<null | 'ranks' | 'how'>(null)
 
@@ -90,8 +91,22 @@ export function PokerTable() {
       ? describe(evaluate([...view.myCards, ...view.board]))
       : null
 
+  const myStack = view?.players.find((p) => p.seat === 0)?.stack ?? 0
+
   return (
     <div className="poker">
+      {over && (
+        <div className="poker-over">
+          <div className="card">
+            <h2>{over.title}</h2>
+            <p className="dim">{over.detail}</p>
+            <p className="stack">剩余筹码 {myStack}</p>
+            <button className="primary-btn" onClick={back}>
+              回房间
+            </button>
+          </div>
+        </div>
+      )}
       <header className="poker-top">
         <div className="brand">DOLOS</div>
         <div className="meta">

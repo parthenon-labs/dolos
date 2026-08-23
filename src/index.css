@@ -2435,3 +2435,27 @@ em.ai {
 /* 牌桌里的静音开关：跟着暗色调走，不能把大厅那颗奶油色按钮搬过来 */
 .lb-sound.dark { padding: 5px 9px; line-height: 0; }
 .lb-sound.dark svg { display: block; }
+
+/* 德州：牌局结束。没有出口的静止画面看起来就是卡死 */
+.poker-over {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  background: #06040399;
+  backdrop-filter: blur(4px);
+  animation: fade-in .18s linear both;
+}
+.poker-over .card {
+  padding: 28px 34px 24px;
+  text-align: center;
+  border: 1px solid #45311f;
+  border-radius: 12px;
+  background: linear-gradient(#1b120b, #120c08);
+  box-shadow: 0 24px 60px #000a;
+  animation: modal-pop .22s var(--ease-pop) both;
+}
+.poker-over h2 { margin: 0; font: 400 26px/1.2 'Iowan Old Style', 'Songti SC', Georgia, serif; color: #e8c65a; }
+.poker-over .dim { margin: 6px 0 4px; color: #9a8168; font-size: 13px; }
+.poker-over .stack { margin: 0 0 18px; color: #cbb08a; font: 600 14px/1 system-ui; }

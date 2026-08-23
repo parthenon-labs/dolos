@@ -27,6 +27,13 @@ type TableState = {
   /** 本手牌的分配结果，用来飘筹码 */
   awarded: { seat: Seat; won: number }[]
   handNo: number
+  /**
+   * 牌局为什么结束了。null = 还在打。
+   *
+   * 这条一定要有：输光筹码之后，牌桌原来就那么停在那里，
+   * 只有日志里一行小字说"你已经输光了"。**没有出口的静止画面看起来就是卡死。**
+   */
+  over: { title: string; detail: string } | null
 
   setView: (v: PlayerView) => void
   setPending: (p: TableState['pending']) => void
@@ -35,6 +42,7 @@ type TableState = {
   setShowdown: (r: { seat: Seat; label: string; best: number[] }[]) => void
   setAwarded: (r: { seat: Seat; won: number }[]) => void
   newHand: (n: number) => void
+  setOver: (o: TableState['over']) => void
   reset: () => void
 }
 
@@ -48,6 +56,7 @@ export const useTable = create<TableState>((set) => ({
   showdown: [],
   awarded: [],
   handNo: 0,
+  over: null,
 
   setView: (v) => set({ view: v }),
   setPending: (p) => set({ pending: p }),
@@ -59,8 +68,9 @@ export const useTable = create<TableState>((set) => ({
   setShowdown: (showdown) => set({ showdown }),
   setAwarded: (awarded) => set({ awarded }),
   newHand: (handNo) => set({ handNo, showdown: [], awarded: [], lastActor: null }),
+  setOver: (over) => set({ over }),
   reset: () =>
-    set({ view: null, pending: null, log: [], lastActor: null, showdown: [], awarded: [], handNo: 0 }),
+    set({ view: null, pending: null, log: [], lastActor: null, showdown: [], awarded: [], handNo: 0, over: null }),
 }))
 
 /** 把一条引擎事件翻成人话。**唯一知道事件怎么念的地方** */

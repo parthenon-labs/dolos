@@ -35,6 +35,9 @@ function RoomBody() {
 
   const g = room ? gameById(room.game) : null
   const iAmHost = !!room?.players.some((p) => !p.isAI && p.host)
+  // 打完一局之后，谁都能开下一局 —— 不用等房主，也不自动开
+  const justFinished = !!room?.finished
+  const canStart = iAmHost || justFinished
   const empty = room ? room.max - room.players.length : 0
   const roomId = room?.id
 
@@ -63,7 +66,7 @@ function RoomBody() {
   }, [roomId, aiChatter])
 
   useEffect(() => {
-    if (iAmHost || !roomId) return
+    if (canStart || !roomId) return
     setCountdown(3)
     const tick = setInterval(() => setCountdown((c) => (c === null ? null : c - 1)), 1000)
     const go = setTimeout(() => start(), 3300)
@@ -72,7 +75,7 @@ function RoomBody() {
       clearTimeout(go)
       setCountdown(null)
     }
-  }, [iAmHost, roomId, start])
+  }, [canStart, roomId, start])
 
   if (!room || !g) return null
 
@@ -129,12 +132,14 @@ function RoomBody() {
             <span className="lb-roomhint">
               {empty > 0 ? `还差 ${empty} 个人，开始时由 AI 补上` : '人齐了'}
             </span>
-            <button className="lb-btn lb-btn-xl lb-btn-go" disabled={!iAmHost} onClick={start}>
-              {iAmHost
-                ? '开始游戏'
-                : countdown !== null && countdown > 0
-                  ? `房主 ${countdown} 秒后开始`
-                  : '开始中…'}
+            <button className="lb-btn lb-btn-xl lb-btn-go" disabled={!canStart} onClick={start}>
+              {justFinished
+                ? '再来一局'
+                : iAmHost
+                  ? '开始游戏'
+                  : countdown !== null && countdown > 0
+                    ? `房主 ${countdown} 秒后开始`
+                    : '开始中…'}
             </button>
           </div>
         </div>

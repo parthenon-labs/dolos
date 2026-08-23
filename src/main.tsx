@@ -7,6 +7,7 @@ import { useGameStore } from './state/useGameStore'
 import { useLobby } from './lobby/useLobby'
 import { useCatan } from './catan/useCatan'
 import { useDdz } from './ddz/useDdz'
+import { useTable } from './poker/useTable'
 
 /**
  * 开发期状态句柄。控制台里可以直接驱动和检查状态，比如：
@@ -22,6 +23,7 @@ if (import.meta.env.DEV) {
     lobby: useLobby,
     catan: useCatan,
     ddz: useDdz,
+    poker: useTable,
     /** 一步跳进某个游戏。手动点四五下才能到牌桌，验证界面时太慢了 */
     play: (game: 'poker' | 'ddz' | 'catan') => {
       usePlayerStore.getState().setEntered(true)

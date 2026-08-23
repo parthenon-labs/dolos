@@ -33,6 +33,17 @@ export type Room = {
   password: string | null
   status: 'waiting' | 'playing'
   chat: ChatLine[]
+  /**
+   * 刚打完一局。
+   *
+   * 这个标记只做一件事：**打完之后不要再自动开局**。
+   * 少了它，在别人的房里点"回房间"，AI 房主立刻又倒数三秒开下一局，
+   * 于是回不去大厅 —— 唯一的出路是在牌桌里点"离开"，
+   * 而那时玩家已经以为自己按错了。
+   *
+   * 顺带它也让"再来一局"对所有人可点，不用等房主。
+   */
+  finished?: boolean
 }
 
 export type Filter = GameId | 'all'
@@ -319,7 +330,7 @@ export const useLobby = create<LobbyState>((set, get) => ({
         playing: true,
         rooms: s.rooms.map((r) =>
           r.id === room.id
-            ? { ...r, status: 'playing' as const, players: [...r.players, ...fillers] }
+            ? { ...r, status: 'playing' as const, finished: false, players: [...r.players, ...fillers] }
             : r,
         ),
       }
@@ -328,7 +339,16 @@ export const useLobby = create<LobbyState>((set, get) => ({
   endGame: () =>
     set((s) => ({
       playing: false,
-      rooms: s.rooms.map((r) => (r.id === s.myRoomId ? { ...r, status: 'waiting' as const } : r)),
+      rooms: s.rooms.map((r) =>
+        r.id === s.myRoomId
+          ? {
+              ...r,
+              status: 'waiting' as const,
+              finished: true,
+              chat: [...r.chat, { id: chatId++, who: '', text: '这一局结束了', system: true }].slice(-40),
+            }
+          : r,
+      ),
     })),
 }))
 
