@@ -1,4 +1,4 @@
-import { usePlayerStore } from '../../state/usePlayerStore'
+import { useEntered } from '../../state/useEntered'
 
 /**
  * 进场页。
@@ -8,7 +8,7 @@ import { usePlayerStore } from '../../state/usePlayerStore'
  * 浏览器不允许没有用户操作就 resume 音频，接真语音时就是靠这一下。
  */
 export function StartScreen() {
-  const setEntered = usePlayerStore((s) => s.setEntered)
+  const setEntered = useEntered((s) => s.setEntered)
   return (
     <div className="lb-start">
       <div className="lb-start-card">

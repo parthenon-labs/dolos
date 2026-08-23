@@ -1,49 +1,18 @@
-import { useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { usePlayerStore } from '../../state/usePlayerStore'
 import { seatFacing, seatLocal } from '../hallLayout'
 
 /**
  * 一把椅子。
  *
- * 它本身不再处理任何输入 —— 选中哪把是 SeatPicker 按距离算出来的，
- * 这里只负责把结果画出来：空位常态微微呼吸，被选中就亮起来并浮出提示。
- * 之前那个用来接指针事件的透明命中体已经不需要了。
+ * 以前它还画两样东西：地上的青色光圈（"这个位置可以坐"）和
+ * 悬在椅背上方的 `E 坐下` 提示。大厅改成 2D 之后**这两样都成了假承诺** ——
+ * 光圈还在亮，而那把椅子已经坐不进去了。
+ *
+ * 一个还在发邀请的、点了没反应的东西，比没有它更糟。所以只剩木头。
  */
-export function Seat({
-  tableId,
-  index,
-  seatCount,
-  empty,
-  mine = false,
-}: {
-  tableId: string
-  index: number
-  seatCount: number
-  empty: boolean
-  /** 玩家正坐在这把椅子上 */
-  mine?: boolean
-}) {
-  const glow = useRef<THREE.MeshBasicMaterial>(null)
-  const mode = usePlayerStore((s) => s.mode)
-  const hovered = usePlayerStore((s) => s.hovered)
-
-  const isHovered =
-    !!hovered && hovered.tableId === tableId && hovered.seat === index
-  const selectable = empty && mode === 'walking'
-
+export function Seat({ index, seatCount }: { index: number; seatCount: number }) {
   const pos = seatLocal(index, seatCount)
   const rot = seatFacing(index, seatCount)
-
-  useFrame((_, dt) => {
-    if (!glow.current) return
-    const t = performance.now() / 1000
-    const base = selectable ? 0.16 + Math.sin(t * 2.1 + index) * 0.05 : 0
-    const target = isHovered ? 0.9 : base
-    glow.current.opacity = THREE.MathUtils.damp(glow.current.opacity, target, 12, dt)
-  })
 
   return (
     <group position={pos} rotation={[0, rot, 0]}>
@@ -52,17 +21,11 @@ export function Seat({
         <boxGeometry args={[0.42, 0.06, 0.42]} />
         <meshStandardMaterial color="#2a1c14" roughness={0.85} />
       </mesh>
-      {/*
-        靠背。**自己坐的那把不画** —— 相机后拉到 2.67m 之后就在椅背后面了，
-        不藏起来的话画面下三分之一是一块深色木板。
-        只影响自己这一台的渲染，别人看到的那把椅子照常在。
-      */}
-      {!mine && (
+      {/* 靠背 */}
       <mesh position={[0, 0.74, 0.2]} castShadow>
         <boxGeometry args={[0.42, 0.56, 0.05]} />
         <meshStandardMaterial color="#241811" roughness={0.85} />
       </mesh>
-      )}
       {/* 四条腿 */}
       {[
         [-0.17, -0.17],
@@ -75,34 +38,10 @@ export function Seat({
           <meshStandardMaterial color="#1b120d" roughness={0.9} />
         </mesh>
       ))}
-
-      {/* 地面上的指示光圈 */}
-      <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
-        <ringGeometry args={[0.26, 0.33, 32]} />
-        <meshBasicMaterial
-          ref={glow}
-          color={isHovered ? '#ffd9a0' : '#2ee0c0'}
-          transparent
-          opacity={0}
-          depthWrite={false}
-          toneMapped={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      {/* 提示牌贴在椅子上方，而不是屏幕正中 */}
-      {isHovered && (
-        <Html
-          position={[0, 1.15, 0]}
-          center
-          zIndexRange={[20, 10]}
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
-        >
-          <div className="seat-prompt">
-            <kbd>E</kbd> 坐下
-          </div>
-        </Html>
-      )}
     </group>
   )
 }
+
+/** 椅子不再吃朝向以外的任何状态，这个导出只是给别处算位置用 */
+export const seatWorldFacing = (index: number, seatCount: number): THREE.Euler =>
+  new THREE.Euler(0, seatFacing(index, seatCount), 0)

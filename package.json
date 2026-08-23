@@ -7,11 +7,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "game": "tsx src/game/cli.ts",
-    "check:leak": "tsx src/game/leakGuard.check.ts",
     "check:poker": "tsx src/poker/evaluate.check.ts",
     "check:engine": "tsx src/poker/engine.check.ts",
-    "check": "npm run check:leak && npm run check:poker && npm run check:engine && npm run check:ddz && npm run check:catan",
+    "check": "npm run check:poker && npm run check:engine && npm run check:ddz && npm run check:catan",
     "check:ddz": "tsx src/ddz/combo.check.ts && tsx src/ddz/engine.check.ts",
     "check:catan": "tsx src/catan/engine.check.ts"
   },
@@ -27,7 +25,6 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.117.1",
     "@types/node": "^26.2.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

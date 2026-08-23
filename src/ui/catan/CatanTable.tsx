@@ -15,7 +15,7 @@ import {
   type Seat,
   type TradeOffer,
 } from '../../catan/types'
-import { Avatar } from '../match/Avatar'
+import { Avatar } from '../Avatar'
 import { SoundToggle } from '../lobby/SoundToggle'
 import { CatanBoard } from './CatanBoard'
 

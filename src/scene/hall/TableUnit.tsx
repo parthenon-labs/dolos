@@ -3,7 +3,6 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getAmp } from '../../audio/amplitudes'
 import { useGameStore } from '../../state/useGameStore'
-import { usePlayerStore } from '../../state/usePlayerStore'
 import {
   TABLE_HEIGHT,
   TABLE_RADIUS,
@@ -15,7 +14,6 @@ import {
 import { Character } from '../character/Character'
 import { LightShaft } from './LightShaft'
 import { Seat } from './Seat'
-import { TableChoreography } from './TableChoreography'
 
 /**
  * 一张桌子的全部：桌体、吊灯、光锥、椅子、坐着的人、牌。
@@ -26,7 +24,6 @@ import { TableChoreography } from './TableChoreography'
  */
 export function TableUnit({ table, castShadows }: { table: TableDef; castShadows: boolean }) {
   const occupancy = useGameStore((s) => s.occupancy[table.id]) ?? []
-  const seatedAt = usePlayerStore((s) => s.seatedAt)
 
   return (
     <group
@@ -38,25 +35,12 @@ export function TableUnit({ table, castShadows }: { table: TableDef; castShadows
       <LightShaft position={[0, TABLE_HEIGHT + 0.78, 0]} height={1.5} radius={1.4} />
       <Cards seats={table.seats} />
       <SpeakerRings tableId={table.id} seats={table.seats} />
-      {/* 编排只在玩家坐着的那张桌子上跑 —— 呈现状态是单桌的，
-          将来多桌同时进行时要按 tableId 分开存 */}
-      {seatedAt?.tableId === table.id && <TableChoreography seats={table.seats} />}
-
       {Array.from({ length: table.seats }, (_, i) => {
         const occ = occupancy[i] ?? null
-        // 玩家自己坐的位置不渲染角色 —— 相机就在他脑袋里
-        const isMe =
-          !!seatedAt && seatedAt.tableId === table.id && seatedAt.seat === i
         return (
           <group key={i}>
-            <Seat
-              tableId={table.id}
-              index={i}
-              seatCount={table.seats}
-              empty={occ === null}
-              mine={isMe}
-            />
-            {occ && !isMe && (
+            <Seat index={i} seatCount={table.seats} />
+            {occ && (
               <Character
                 tableId={table.id}
                 seat={i}

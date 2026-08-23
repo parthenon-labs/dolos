@@ -13,9 +13,8 @@ import { LightBudget } from './LightBudget'
 import { SignWall } from './uts/SignWall'
 import { CampusModels } from './uts/CampusModels'
 import { UtsDressing } from './uts/UtsDressing'
-import { CueDriver, useEventBridge } from '../anim/CueDriver'
-import { useDemoGame } from '../anim/useDemoGame'
-import { useTableView } from '../state/useTableStore'
+import { CueDriver } from '../anim/CueDriver'
+import { useTavernLife } from '../anim/tavernLife'
 import { useCues } from '../anim/cues'
 import { preloadModels } from './character/models'
 import { gestureAtTable, registeredSeats, setActiveTable } from './character/rigRegistry'
@@ -40,11 +39,9 @@ const BACKDROP_TABLE = 't3'
 const BACKDROP_SEATS = 5
 
 export function Scene() {
-  // 背景里那桌人一直在打。**这是有意的** —— 空荡荡的酒馆当背景很惨淡，
-  // 有人在动才叫"营业中"。事件源还是本地假对局，接了 WebSocket 之后
-  // 可以换成真实房间的事件，useEventBridge 那边一行不用改。
-  const demoEvents = useDemoGame(true, BACKDROP_SEATS)
-  useEventBridge(demoEvents, BACKDROP_SEATS)
+  // 背景里那桌人一直在动。**这是有意的** —— 空荡荡的酒馆当背景很惨淡，
+  // 有人在动才叫"营业中"。
+  useTavernLife(BACKDROP_SEATS)
 
   useEffect(() => {
     setActiveTable(BACKDROP_TABLE)
@@ -91,7 +88,6 @@ function DevHandle() {
     d.scene = scene
     d.camera = camera
     d.gl = gl
-    d.tableView = useTableView
     d.cues = useCues
     d.gesture = gestureAtTable
     d.rigs = registeredSeats

@@ -1,4 +1,4 @@
-import { usePlayerStore } from '../state/usePlayerStore'
+import { useEntered } from '../state/useEntered'
 import { useLobby, useMyRoom } from '../lobby/useLobby'
 import { Boom } from './Boom'
 import { Lobby } from './lobby/Lobby'
@@ -24,7 +24,7 @@ export function Shell() {
 }
 
 function Screen() {
-  const entered = usePlayerStore((s) => s.entered)
+  const entered = useEntered((s) => s.entered)
   const playing = useLobby((s) => s.playing)
   const room = useMyRoom()
 
