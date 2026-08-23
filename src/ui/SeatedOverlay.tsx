@@ -1,7 +1,15 @@
+import { Suspense, lazy } from 'react'
 import { useLobby, useMyRoom } from '../lobby/useLobby'
-import { PokerTable } from './poker/PokerTable'
-import { DdzTable } from './ddz/DdzTable'
-import { CatanTable } from './catan/CatanTable'
+
+/**
+ * 三个牌桌各自成块，用到哪个下哪个。
+ *
+ * 一个只想打斗地主的人，没理由先下载卡坦的棋盘几何和德州的牌力评估。
+ * 而且这三块本来就**只在开局时挂载**，懒加载和现有的生命周期正好对上。
+ */
+const PokerTable = lazy(() => import('./poker/PokerTable').then((m) => ({ default: m.PokerTable })))
+const DdzTable = lazy(() => import('./ddz/DdzTable').then((m) => ({ default: m.DdzTable })))
+const CatanTable = lazy(() => import('./catan/CatanTable').then((m) => ({ default: m.CatanTable })))
 
 /**
  * 开局之后盖在 3D 背景上的那一层。
@@ -17,7 +25,9 @@ export function SeatedOverlay() {
   const room = useMyRoom()
 
   if (!playing || !room) return null
-  if (room.game === 'poker') return <PokerTable />
-  if (room.game === 'ddz') return <DdzTable />
-  return <CatanTable />
+  return (
+    <Suspense fallback={<div className="table-loading">正在开桌…</div>}>
+      {room.game === 'poker' ? <PokerTable /> : room.game === 'ddz' ? <DdzTable /> : <CatanTable />}
+    </Suspense>
+  )
 }

@@ -1,35 +1,23 @@
-import { Canvas } from '@react-three/fiber'
-import { Leva } from 'leva'
-import { Suspense } from 'react'
-import * as THREE from 'three'
-import { Scene } from './scene/Scene'
+import { Suspense, lazy } from 'react'
 import { Shell } from './ui/Shell'
 import { useClickSound } from './audio/useSound'
+
+/**
+ * 3D 背景懒加载。
+ *
+ * three.js + 后处理是这个包里最大的一坨，而它画的是装饰。
+ * 让进场页等它下完再出现，等于把首屏押在一件可有可无的事情上。
+ * fallback 给 null —— 背景晚零点几秒淡进来没人会注意到。
+ */
+const Backdrop = lazy(() => import('./scene/Backdrop'))
 
 export default function App() {
   useClickSound()
   return (
     <>
-      <Canvas
-        shadows
-        dpr={[1, 2]}
-        camera={{ fov: 72, near: 0.08, far: 60 }}
-        gl={{
-          antialias: false, // 交给 EffectComposer 的 multisampling
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.05,
-        }}
-      >
-        <Suspense fallback={null}>
-          <Scene />
-        </Suspense>
-      </Canvas>
-      {/*
-        leva 面板只在开发时显示。
-        不显式挂 <Leva> 的话它会自己创建一个面板 —— 线上 demo 右上角
-        挂着一排调试滑块，看起来像没做完。
-      */}
-      <Leva hidden={!import.meta.env.DEV} />
+      <Suspense fallback={null}>
+        <Backdrop />
+      </Suspense>
       {/*
         大厅、房间、牌桌全部盖在 3D 上面，而不是替换掉它。
         3D 一直在背后渲染是有意的：那座酒馆现在是**背景**，

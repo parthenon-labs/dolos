@@ -2459,3 +2459,54 @@ em.ai {
 .poker-over h2 { margin: 0; font: 400 26px/1.2 'Iowan Old Style', 'Songti SC', Georgia, serif; color: #e8c65a; }
 .poker-over .dim { margin: 6px 0 4px; color: #9a8168; font-size: 13px; }
 .poker-over .stack { margin: 0 0 18px; color: #cbb08a; font: 600 14px/1 system-ui; }
+
+/* 崩了的时候。白屏是最糟的失败方式，至少要有一条回去的路 */
+.boom {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(100% 70% at 50% 40%, #2a170c 0%, #0a0603 100%);
+}
+.boom-card {
+  width: min(560px, 92vw);
+  padding: 26px 28px 22px;
+  text-align: center;
+  border: 3px solid #3b2416;
+  border-radius: 20px;
+  background: linear-gradient(#fff4e0, #ffe8c4);
+  color: #3b2416;
+  font-family: 'Baloo 2', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  box-shadow: 0 10px 0 #3b241659, 0 30px 70px #000b;
+}
+.boom-card h2 { margin: 0 0 6px; font: 900 22px/1.2 inherit; }
+.boom-card .dim { margin: 0 0 14px; color: #93745a; font: 700 13px/1 inherit; }
+.boom-msg {
+  margin: 0 0 20px;
+  padding: 10px 12px;
+  max-height: 140px;
+  overflow: auto;
+  text-align: left;
+  border: 2px solid #d6bb96;
+  border-radius: 10px;
+  background: #fffdf7;
+  color: #8a5a3a;
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 牌桌按需加载时的占位。它出现的时间通常不到一眼，但不能是空白 */
+.table-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  color: #8a7159;
+  font: 14px/1 'Iowan Old Style', 'Songti SC', Georgia, serif;
+  background: #0b0806cc;
+  backdrop-filter: blur(10px);
+}
