@@ -2482,3 +2482,24 @@ em.ai {
   background: #0b0806cc;
   backdrop-filter: blur(10px);
 }
+
+/* ---------- 大厅：你自己 ---------- */
+
+.lb-me { cursor: pointer; font-family: var(--font); transition: transform .1s, box-shadow .1s; }
+.lb-me:active { transform: translateY(4px); box-shadow: 0 0 0 var(--lip); }
+.lb-me-av.big { width: 44px; height: 44px; }
+.lb-profile-row { display: flex; align-items: center; gap: 12px; }
+.lb-profile-row .lb-input { flex: 1; min-width: 0; }
+.lb-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.lb-swatch {
+  width: 30px;
+  height: 30px;
+  border: 2.5px solid var(--ink);
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  transition: transform .1s;
+}
+.lb-swatch:hover { transform: translateY(-2px); }
+/* 选中的那个套一圈，而不是变形 —— 变形会让一排圆点看起来在跳 */
+.lb-swatch.on { box-shadow: 0 0 0 3px #fff8ea, 0 0 0 6px var(--ink); }

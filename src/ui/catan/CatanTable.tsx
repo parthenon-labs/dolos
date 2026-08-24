@@ -169,7 +169,7 @@ export function CatanTable() {
                 <Avatar color={colors[p.seat]} size={26} />
                 <div className="cinfo">
                   <div className="cname">
-                    {p.seat === view.me ? '你' : p.name}
+                    {p.name}
                     {p.hasLongestRoad && <span className="badge road">最长路</span>}
                     {p.hasLargestArmy && <span className="badge army">最大军</span>}
                   </div>

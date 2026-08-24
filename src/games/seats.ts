@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useMyRoom } from '../lobby/useLobby'
+import { useProfile } from '../state/useProfile'
 
 /**
  * 空位的补位 AI。
@@ -37,13 +38,12 @@ export type RosterSeat = {
  */
 export function useRoster(count: number): RosterSeat[] {
   const room = useMyRoom()
+  const myName = useProfile((s) => s.name)
+  const myColor = useProfile((s) => s.color)
 
   return useMemo(() => {
     if (!room || count <= 0) return []
-    const me = room.players.find((p) => !p.isAI)
-    const roster: RosterSeat[] = [
-      { seat: 0, name: '你', color: me?.color ?? '#e2743a', isAI: false },
-    ]
+    const roster: RosterSeat[] = [{ seat: 0, name: myName, color: myColor, isAI: false }]
     // 房里其他人先上，不够再拿 FILLERS 兜底 ——
     // 你在房间里看到的是谁，开局之后对面就是谁
     const others = room.players.filter((p) => p.isAI)
@@ -53,5 +53,5 @@ export function useRoster(count: number): RosterSeat[] {
       roster.push({ seat: i, name: o?.name ?? f.name, color: o?.color ?? f.color, isAI: true })
     }
     return roster
-  }, [room, count])
+  }, [room, count, myName, myColor])
 }

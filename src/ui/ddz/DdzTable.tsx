@@ -159,7 +159,9 @@ export function DdzTable() {
           <Avatar color={roster[me]?.color ?? '#c9a227'} size={30} />
           <div>
             <div className="name">
-              你
+              {/* 显示自己的昵称而不是"你" —— 这是别人看到的名字，
+                  自己那一栏也该是同一个，靠高亮区分是谁，不靠改称呼 */}
+              {roster[me]?.name ?? '你'}
               {view.landlord === me && <span className="lordbadge">地主</span>}
             </div>
             <div className={`left${hand.length <= 3 ? ' hot' : ''}`}>{hand.length} 张</div>

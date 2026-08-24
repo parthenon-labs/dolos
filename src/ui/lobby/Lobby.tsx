@@ -4,6 +4,7 @@ import { GAMES, gameById, type GameId } from '../../games/registry'
 import { PAGE_SIZE, useLobby, visibleRooms, type Room } from '../../lobby/useLobby'
 import { CreateRoom } from './CreateRoom'
 import { Glyph } from './Glyph'
+import { ProfileCard } from './ProfileCard'
 import { SoundToggle } from './SoundToggle'
 import { useKeys } from './useKeys'
 
@@ -85,10 +86,7 @@ export function Lobby() {
         </div>
         <div className="lb-topright">
           <SoundToggle />
-          <div className="lb-me">
-            <span className="lb-me-av" />
-            <span className="lb-me-name">你</span>
-          </div>
+          <ProfileCard />
         </div>
       </header>
 

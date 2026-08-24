@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { GAMES, gameById, type GameId } from '../games/registry'
+import { me } from '../state/useProfile'
 
 /**
  * 大厅。
@@ -106,8 +107,6 @@ let chatId = 0
 
 const makeRooms = (n: number) => Array.from({ length: n }, mockRoom)
 
-export const ME = { name: '你', color: '#e2743a' }
-
 type LobbyState = {
   rooms: Room[]
   myRoomId: string | null
@@ -146,11 +145,27 @@ type LobbyState = {
  */
 export const PAGE_SIZE = 10
 
+/**
+ * 上次看的是哪一类。
+ *
+ * 只想打斗地主的人，每次进来都要先点一下"斗地主" —— 一次不烦，
+ * 第五次就烦了。这种"上次怎么样"的小记忆，是"顺手"和"能用"之间的差别。
+ */
+const FILTER_KEY = 'dolos.filter'
+const loadFilter = (): Filter => {
+  try {
+    const v = localStorage.getItem(FILTER_KEY)
+    return v === 'poker' || v === 'ddz' || v === 'catan' ? v : 'all'
+  } catch {
+    return 'all'
+  }
+}
+
 export const useLobby = create<LobbyState>((set, get) => ({
   rooms: makeRooms(23),
   myRoomId: null,
   playing: false,
-  filter: 'all',
+  filter: loadFilter(),
   query: '',
   page: 0,
 
@@ -220,7 +235,7 @@ export const useLobby = create<LobbyState>((set, get) => ({
       return {
         rooms: s.rooms.map((r) =>
           r.id === s.myRoomId
-            ? { ...r, chat: [...r.chat, { id: chatId++, who: ME.name, text: t }].slice(-40) }
+            ? { ...r, chat: [...r.chat, { id: chatId++, who: me().name, text: t }].slice(-40) }
             : r,
         ),
       }
@@ -242,7 +257,14 @@ export const useLobby = create<LobbyState>((set, get) => ({
       }
     }),
 
-  setFilter: (filter) => set({ filter, page: 0 }),
+  setFilter: (filter) => {
+    try {
+      localStorage.setItem(FILTER_KEY, filter)
+    } catch {
+      // 无痕模式。记不住就算了
+    }
+    set({ filter, page: 0 })
+  },
   setQuery: (query) => set({ query, page: 0 }),
   setPage: (page) => set({ page }),
   // 刷新只换掉别人的房间，我自己那间留着 —— 刷新的时候被踢出房是很烦的
@@ -257,10 +279,10 @@ export const useLobby = create<LobbyState>((set, get) => ({
     const room: Room = {
       id: `r${nextNo}`,
       no: nextNo++,
-      name: name.trim() || `${ME.name}的房间`,
+      name: name.trim() || `${me().name}的房间`,
       game,
       max: g.players.max,
-      players: [{ ...ME, isAI: false, host: true }],
+      players: [{ ...me(), isAI: false, host: true }],
       locked: !!password,
       password,
       status: 'waiting',
@@ -282,10 +304,10 @@ export const useLobby = create<LobbyState>((set, get) => ({
         r.id === id
           ? {
               ...r,
-              players: [...r.players, { ...ME, isAI: false, host: false }],
+              players: [...r.players, { ...me(), isAI: false, host: false }],
               chat: [
                 ...r.chat,
-                { id: chatId++, who: '', text: `${ME.name}进来了`, system: true },
+                { id: chatId++, who: '', text: `${me().name}进来了`, system: true },
                 // 进门有人搭话，房间才像有人。全静默的房间比空房间更冷
                 { id: chatId++, who: r.players[0].name, text: pick(AI_LINES) },
               ].slice(-40),
