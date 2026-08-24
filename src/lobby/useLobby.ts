@@ -22,6 +22,9 @@ export type RoomPlayer = {
 
 export type ChatLine = { id: number; who: string; text: string; system?: boolean }
 
+/** 房间里的累计战绩。一个名字一行 */
+export type RecordRow = { name: string; games: number; wins: number; score: number }
+
 export type Room = {
   id: string
   /** 四位房号。玩家之间报房号比报名字快 */
@@ -45,6 +48,22 @@ export type Room = {
    * 顺带它也让"再来一局"对所有人可点，不用等房主。
    */
   finished?: boolean
+  /**
+   * 这间房打到现在的累计战绩。
+   *
+   * 每个游戏自己的分数只活在一次"开局"里 —— 回房间再来一局就归零。
+   * 但**人对"今天在这桌是赢是输"是有记忆的**，界面没有的话，
+   * 连打三局会觉得每一局都是孤立的，房间就只是个开局按钮。
+   */
+  record: RecordRow[]
+  /**
+   * 这间房是我开的。
+   *
+   * 有了它，离开时就能把自己的房拆掉。不然会留下一间**孤儿房**：
+   * 房主走了、里面全是我开局时补进来的 AI，而如果它还带着密码，
+   * 我自己都再也进不去 —— 一间谁也进不去的房挂在列表上，纯粹是垃圾。
+   */
+  mine?: boolean
 }
 
 export type Filter = GameId | 'all'
@@ -94,6 +113,7 @@ function mockRoom(): Room {
     password: locked ? '1234' : null,
     status: filled >= max || Math.random() < 0.25 ? 'playing' : 'waiting',
     chat: [],
+    record: [],
   }
 }
 
@@ -121,6 +141,8 @@ type LobbyState = {
   /** 一键开玩。返回失败原因，成功返回 null */
   quickPlay: () => string | null
   say: (text: string) => void
+  /** 一局打完，把结果并进房间战绩 */
+  recordResult: (rows: { name: string; delta: number; won: boolean }[]) => void
   /** 房里的 AI 随口说一句 */
   aiChatter: () => void
   setFilter: (f: Filter) => void
@@ -241,6 +263,34 @@ export const useLobby = create<LobbyState>((set, get) => ({
       }
     }),
 
+  /**
+   * 记一局。
+   *
+   * 按**名字**归并而不是座位号：座位每局都在轮转，
+   * 而"今天赢了老孙三把"这件事记的是人。
+   */
+  recordResult: (rows) =>
+    set((s) => {
+      if (!s.myRoomId) return {}
+      return {
+        rooms: s.rooms.map((r) => {
+          if (r.id !== s.myRoomId) return r
+          const rec = r.record.map((x) => ({ ...x }))
+          for (const row of rows) {
+            let cur = rec.find((x) => x.name === row.name)
+            if (!cur) {
+              cur = { name: row.name, games: 0, wins: 0, score: 0 }
+              rec.push(cur)
+            }
+            cur.games++
+            if (row.won) cur.wins++
+            cur.score += row.delta
+          }
+          return { ...r, record: rec }
+        }),
+      }
+    }),
+
   aiChatter: () =>
     set((s) => {
       const room = s.rooms.find((r) => r.id === s.myRoomId)
@@ -287,6 +337,8 @@ export const useLobby = create<LobbyState>((set, get) => ({
       password,
       status: 'waiting',
       chat: [{ id: chatId++, who: '', text: '房间开好了，等人齐就能开始', system: true }],
+      record: [],
+      mine: true,
     }
     set((s) => ({ rooms: [room, ...s.rooms], myRoomId: room.id, page: 0 }))
     return room.id
@@ -297,7 +349,18 @@ export const useLobby = create<LobbyState>((set, get) => ({
     if (!room) return '房间不见了'
     if (room.status === 'playing') return '这一局已经开始了'
     if (room.players.length >= room.max) return '房间满了'
-    if (room.locked && password !== room.password) return '密码不对'
+    /**
+     * 别人的带锁房间进不去，而且**界面上就该看得出来**。
+     *
+     * 这些房间是本地造出来的，密码只有代码知道 —— 玩家点进去只能吃一句
+     * "密码不对"，而他没有任何办法知道正确答案。
+     * 那不是一道门，是一堵装了门铃的墙。
+     *
+     * 所以列表里把它们和"满员""游戏中"归成一类：看得见、进不去、
+     * 一眼知道为什么。建房时仍然可以设密码 —— 那是接了服务端之后
+     * 真正会用到的东西，而且设的人自己就在房里。
+     */
+    if (room.locked && password !== room.password) return '这间房要密码'
     set((s) => ({
       myRoomId: id,
       rooms: s.rooms.map((r) =>
@@ -328,11 +391,18 @@ export const useLobby = create<LobbyState>((set, get) => ({
         playing: false,
         // 我建的房，人走了房就没了；别人的房把我摘掉就行
         rooms:
-          rest.length === 0
+          room.mine || rest.length === 0
             ? s.rooms.filter((r) => r.id !== room.id)
             : s.rooms.map((r) =>
                 r.id === room.id
-                  ? { ...r, status: 'waiting' as const, players: rest.map((p, i) => ({ ...p, host: i === 0 })) }
+                  ? {
+                      ...r,
+                      status: 'waiting' as const,
+                      // 战绩跟着"这一桌人"走。我走了，这桌就散了
+                      record: [],
+                      finished: false,
+                      players: rest.map((p, i) => ({ ...p, host: i === 0 })),
+                    }
                   : r,
               ),
       }

@@ -3,6 +3,7 @@ import { project } from './engine'
 import { nextButton, runHand, type TableSeat } from './table'
 import type { Action, PlayerView, PokerEvent, Seat, TableConfig } from './types'
 import { sfx } from '../audio/sfx'
+import { useLobby } from '../lobby/useLobby'
 import { describeEvent, useTable } from './useTable'
 
 /**
@@ -53,6 +54,23 @@ export type SessionOptions = {
   hands?: number
 }
 
+/**
+ * 德州的"一局"是一整个牌桌 session，不是一手牌。
+ *
+ * 所以战绩在**这张桌子结束的时候**记一次，记的是净输赢筹码。
+ * 按手记的话，连打两百手会把房间战绩刷成一面墙，
+ * 而那面墙说明不了任何事 —— 玩家想知道的是"这一坐下来赚了还是亏了"。
+ */
+function reportTable(seats: TableSeat[], startingStack: number) {
+  useLobby.getState().recordResult(
+    seats.map((s) => ({
+      name: s.name,
+      delta: s.stack - startingStack,
+      won: s.stack > startingStack,
+    })),
+  )
+}
+
 export function startSession(opts: SessionOptions): () => void {
   const config = opts.config ?? { smallBlind: 1, bigBlind: 2, startingStack: 200 }
   const maxHands = opts.hands ?? 200
@@ -61,7 +79,21 @@ export function startSession(opts: SessionOptions): () => void {
   t.reset()
 
   let stopped = false
+  let reported = false
   const seats = opts.seats.map((s) => ({ ...s }))
+
+  /**
+   * 记一次战绩，只记一次。
+   *
+   * 触发点有两个：牌桌自然结束（输光 / 打满 / 筹码归一），
+   * 以及**玩家中途回房间** —— 后者才是常见情况。
+   * 只在自然结束时记的话，打了三十手觉得够了就走的人，战绩永远是空的。
+   */
+  const report = () => {
+    if (reported) return
+    reported = true
+    reportTable(seats, config.startingStack)
+  }
   const nameOf = (s: Seat) => seats.find((x) => x.seat === s)?.name ?? `${s + 1} 号`
 
   const agents = new Map<Seat, PokerAgent>()
@@ -91,6 +123,7 @@ export function startSession(opts: SessionOptions): () => void {
           title: '本桌结束',
           detail: '筹码全到一个人手里了',
         })
+        report()
         break
       }
       if (!withChips.some((s) => s.seat === opts.mySeat)) {
@@ -99,6 +132,7 @@ export function startSession(opts: SessionOptions): () => void {
           title: '你输光了',
           detail: `撑了 ${hand - 1} 手`,
         })
+        report()
         break
       }
 
@@ -164,8 +198,10 @@ export function startSession(opts: SessionOptions): () => void {
       // 最终视图（含摊牌信息）给界面
       if (!stopped) useTable.getState().setView(project(r.state, opts.mySeat))
       await sleep(1400)
-      if (hand === maxHands)
+      if (hand === maxHands) {
         useTable.getState().setOver({ title: '打满了', detail: `${maxHands} 手，到此为止` })
+        report()
+      }
     }
   })().catch((err) => {
     // 引擎抛错说明是 bug（多半是筹码不守恒的断言），必须显式暴露
@@ -176,5 +212,8 @@ export function startSession(opts: SessionOptions): () => void {
   return () => {
     stopped = true
     useTable.getState().setPending(null)
+    // 离开房间时 myRoomId 已经清了，recordResult 会自己 no-op ——
+    // 走人不该往一个已经离开的房间里记账
+    report()
   }
 }

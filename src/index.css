@@ -2301,7 +2301,7 @@ em.ai {
 
 @media (max-width: 900px) {
   .lb-room .lb-board { grid-template-columns: minmax(0, 1fr); }
-  .lb-chat { display: none; }
+  .lb-roomside { display: none; }
 }
 
 /* ---------- 卡坦：跟人换牌 ---------- */
@@ -2503,3 +2503,31 @@ em.ai {
 .lb-swatch:hover { transform: translateY(-2px); }
 /* 选中的那个套一圈，而不是变形 —— 变形会让一排圆点看起来在跳 */
 .lb-swatch.on { box-shadow: 0 0 0 3px #fff8ea, 0 0 0 6px var(--ink); }
+
+/* ---------- 房间：战绩 ---------- */
+
+.lb-roomside { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; min-height: 0; }
+.lb-record {
+  padding: 9px 11px;
+  border: 2.5px solid var(--ink);
+  border-radius: 14px;
+  background: #fffdf7;
+  font: 700 12.5px/1.7 var(--font);
+}
+.lb-record-head { margin-bottom: 4px; color: var(--muted); font-size: 11.5px; letter-spacing: .08em; }
+.lb-record-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px 44px;
+  gap: 6px;
+  border-top: 1.5px solid #efe0c8;
+  padding: 2px 0;
+}
+.lb-record-row:first-of-type { border-top: none; }
+.lb-record .rn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-record .rw { text-align: center; color: var(--muted); }
+.lb-record .rs { text-align: right; }
+.lb-record .rs.up { color: #2f8f4a; }
+.lb-record .rs.down { color: #c8412f; }
+
+/* 带锁的房间和满员、游戏中归成一类 */
+.lb-status.locked { background: #cbb8d8; color: #3a2545; }

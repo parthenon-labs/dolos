@@ -4,6 +4,7 @@ import { runGame, type DdzAgent, type Seats } from './engine'
 import type { DdzEvent, PlayAction, PlayerView, Seat } from './types'
 import { RANK_LABELS, formatRanks, rankOf } from './cards'
 import { sfx } from '../audio/sfx'
+import { useLobby } from '../lobby/useLobby'
 import { useDdz } from './useDdz'
 
 /**
@@ -171,6 +172,10 @@ function apply(e: DdzEvent, nameOf: (s: Seat) => string) {
       sfx(e.winner === 0 ? 'win' : 'lose')
       st.push(`${who}赢　${e.base} 分 × ${e.multiplier} 倍${spring}`, 'result')
       st.setResult(e)
+      // 一局记一笔。斗地主的"一局"就是一手牌，房间战绩按手累计
+      useLobby.getState().recordResult(
+        e.deltas.map((d) => ({ name: nameOf(d.seat), delta: d.delta, won: d.delta > 0 })),
+      )
       break
     }
   }

@@ -18,6 +18,34 @@ export const FILLERS = [
   { name: 'Alumni', color: '#6d6a94' },
 ]
 
+/**
+ * 一桌人的备用颜色。
+ *
+ * 房间里的补位 AI 是随机抽名字的，颜色跟着名字走 —— 于是**会撞色**。
+ * 在德州和斗地主里那只是不好看，在卡坦里是**错的**：
+ * 颜色就是所有权，两家用同一个颜色，棋盘上谁的房子是谁的就分不出来了。
+ *
+ * 所以名单在这里做最后一道去重。
+ */
+const SPARE_COLORS = [
+  '#c2603a', '#3f9ad6', '#8f5fd6', '#4fb56a',
+  '#e0b13a', '#d95a7e', '#3aa8a0', '#9bb03a',
+]
+
+/** 挑一个还没被用掉的颜色。都用完了就退回原色，总比崩了强 */
+function distinct(want: string, used: Set<string>): string {
+  if (!used.has(want)) {
+    used.add(want)
+    return want
+  }
+  const free = SPARE_COLORS.find((c) => !used.has(c))
+  if (free) {
+    used.add(free)
+    return free
+  }
+  return want
+}
+
 export type RosterSeat = {
   seat: number
   name: string
@@ -43,6 +71,8 @@ export function useRoster(count: number): RosterSeat[] {
 
   return useMemo(() => {
     if (!room || count <= 0) return []
+    // 我先占色，AI 依次避开
+    const used = new Set<string>([myColor])
     const roster: RosterSeat[] = [{ seat: 0, name: myName, color: myColor, isAI: false }]
     // 房里其他人先上，不够再拿 FILLERS 兜底 ——
     // 你在房间里看到的是谁，开局之后对面就是谁
@@ -50,7 +80,12 @@ export function useRoster(count: number): RosterSeat[] {
     for (let i = 1; i < count; i++) {
       const o = others[i - 1]
       const f = FILLERS[(i - 1) % FILLERS.length]
-      roster.push({ seat: i, name: o?.name ?? f.name, color: o?.color ?? f.color, isAI: true })
+      roster.push({
+        seat: i,
+        name: o?.name ?? f.name,
+        color: distinct(o?.color ?? f.color, used),
+        isAI: true,
+      })
     }
     return roster
   }, [room, count, myName, myColor])

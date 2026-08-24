@@ -124,7 +124,10 @@ function RoomBody() {
         </div>
         </div>
 
-        <Chat />
+        <div className="lb-roomside">
+          <Record />
+          <Chat />
+        </div>
 
         <div className="lb-roomfoot">
           <p className="lb-tagline">{g.tagline}</p>
@@ -205,5 +208,36 @@ function Chat() {
         </button>
       </div>
     </aside>
+  )
+}
+
+/**
+ * 这一桌打到现在。
+ *
+ * 每个游戏自己的分数只活在一次"开局"里，回房间再来一局就归零。
+ * 但**人对"今天在这桌是赢是输"是有记忆的** —— 界面没有的话，
+ * 连打三局会觉得每局都是孤立的，房间就只是个开局按钮。
+ *
+ * 一局都没打过就不显示：空表格比没有表格更让人以为坏了。
+ */
+function Record() {
+  const room = useMyRoom()
+  if (!room || room.record.length === 0) return null
+  const rows = room.record.slice().sort((a, b) => b.score - a.score || b.wins - a.wins)
+  return (
+    <div className="lb-record">
+      <div className="lb-record-head">这一桌</div>
+      {rows.map((r) => (
+        <div key={r.name} className="lb-record-row">
+          <span className="rn">{r.name}</span>
+          <span className="rw">
+            {r.wins}/{r.games}
+          </span>
+          <span className={`rs ${r.score > 0 ? 'up' : r.score < 0 ? 'down' : ''}`}>
+            {r.score > 0 ? `+${r.score}` : r.score}
+          </span>
+        </div>
+      ))}
+    </div>
   )
 }

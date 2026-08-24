@@ -11,6 +11,7 @@ import {
   type TradeOffer,
 } from './types'
 import { sfx } from '../audio/sfx'
+import { useLobby } from '../lobby/useLobby'
 import { useCatan } from './useCatan'
 
 /**
@@ -132,7 +133,16 @@ export function startCatanSession(opts: CatanSessionOptions): () => void {
   useCatan.getState().push('—— 开局摆放 ——', 'system')
   void runGame(seats, agents, rng, (e) => {
     if (!stopped) apply(e, nameOf)
-  }).catch((err) => {
+  })
+    .then((r) => {
+      if (stopped || r.winner === null) return
+      // 卡坦的一局很长，所以战绩记的是**分数**而不是胜负次数 ——
+      // 输了拿八分和输了拿三分，在同一桌人心里完全不是一回事
+      useLobby.getState().recordResult(
+        r.vps.map((v) => ({ name: nameOf(v.seat), delta: v.vp, won: v.seat === r.winner })),
+      )
+    })
+    .catch((err) => {
     // 引擎抛错说明是 bug（多半是守恒断言或者非法动作），必须显式暴露
     console.error('[catan] 牌局异常中断', err)
     useCatan.getState().push(`对局异常中断：${(err as Error).message}`, 'system')

@@ -33,8 +33,6 @@ export function Lobby() {
   const quickPlay = useLobby((s) => s.quickPlay)
 
   const [creating, setCreating] = useState(false)
-  const [asking, setAsking] = useState<Room | null>(null)
-  const [pwd, setPwd] = useState('')
   const [err, setErr] = useState<string | null>(null)
 
   /**
@@ -48,27 +46,17 @@ export function Lobby() {
     return () => clearInterval(t)
   }, [tick])
 
-  useKeys({
-    Escape: creating || asking ? () => (setCreating(false), setAsking(null)) : undefined,
-  })
+  useKeys({ Escape: creating ? () => setCreating(false) : undefined })
 
   const list = useMemo(() => visibleRooms(rooms, filter, query), [rooms, filter, query])
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
   const clamped = Math.min(page, pages - 1)
   const shown = list.slice(clamped * PAGE_SIZE, clamped * PAGE_SIZE + PAGE_SIZE)
 
-  const tryJoin = (r: Room, password?: string) => {
-    const why = join(r.id, password)
-    if (why) {
-      setErr(why)
-      // 密码错了留在弹窗里再试一次，其余的错误直接提示
-      if (r.locked && why === '密码不对') return
-      setAsking(null)
-      return
-    }
-    setAsking(null)
-    setErr(null)
-    sfx('join')
+  const tryJoin = (r: Room) => {
+    const why = join(r.id)
+    if (why) setErr(why)
+    else sfx('join')
   }
 
   const onQuick = () => {
@@ -132,7 +120,7 @@ export function Lobby() {
         <div className="lb-rows">
           {shown.length === 0 && <div className="lb-empty">这里空空的，建一间吧</div>}
           {shown.map((r) => (
-            <RoomRow key={r.id} room={r} onJoin={() => (r.locked ? (setPwd(''), setAsking(r)) : tryJoin(r))} />
+            <RoomRow key={r.id} room={r} onJoin={() => tryJoin(r)} />
           ))}
         </div>
 
@@ -154,38 +142,14 @@ export function Lobby() {
         </div>
       </div>
 
-      {err && !asking && (
-        <div className="lb-toast" onAnimationEnd={() => setErr(null)}>
+      {err && (
+        <div className="lb-toast" key={err} onAnimationEnd={() => setErr(null)}>
           {err}
         </div>
       )}
 
       {creating && <CreateRoom onClose={() => setCreating(false)} />}
 
-      {asking && (
-        <div className="lb-modal-back" onClick={() => setAsking(null)}>
-          <div className="lb-modal small" onClick={(e) => e.stopPropagation()}>
-            <h3>这间房要密码</h3>
-            <input
-              className="lb-input"
-              autoFocus
-              value={pwd}
-              placeholder="四位数字"
-              onChange={(e) => setPwd(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && tryJoin(asking, pwd)}
-            />
-            {err && <div className="lb-err">{err}</div>}
-            <div className="lb-modal-foot">
-              <button className="lb-btn lb-btn-ghost" onClick={() => setAsking(null)}>
-                算了
-              </button>
-              <button className="lb-btn lb-btn-go" onClick={() => tryJoin(asking, pwd)}>
-                进去
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -194,7 +158,9 @@ function RoomRow({ room, onJoin }: { room: Room; onJoin: () => void }) {
   const g = gameById(room.game)
   const full = room.players.length >= room.max
   const playing = room.status === 'playing'
-  const openable = !playing && !full
+  // 带锁的房间和"满员""游戏中"一样：看得见、进不去、一眼知道为什么。
+  // 它的密码只有代码知道，让人点进去吃一句"密码不对"是在耍人
+  const openable = !playing && !full && !room.locked
 
   return (
     <div
@@ -222,8 +188,10 @@ function RoomRow({ room, onJoin }: { room: Room; onJoin: () => void }) {
           {room.players.length}/{room.max}
         </span>
       </div>
-      <div className={`lb-status ${playing ? 'playing' : full ? 'full' : 'waiting'}`}>
-        {playing ? '游戏中' : full ? '满员' : '等待中'}
+      <div
+        className={`lb-status ${playing ? 'playing' : full ? 'full' : room.locked ? 'locked' : 'waiting'}`}
+      >
+        {playing ? '游戏中' : full ? '满员' : room.locked ? '有密码' : '等待中'}
       </div>
       <div className="lb-enter">{openable ? <span className="lb-btn lb-btn-go tiny">进入</span> : null}</div>
     </div>
